@@ -1,0 +1,10 @@
+<Project>
+  <!--
+    Auto-generated protobuf files use obsolete APIs and suppress their own
+    warnings with #pragma. We override TreatWarningsAsErrors here so the
+    root-level setting does not cause build failures in generated code.
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

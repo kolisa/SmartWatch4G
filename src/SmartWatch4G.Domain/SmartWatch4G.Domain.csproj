@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>SmartWatch4G.Domain</RootNamespace>
+    <AssemblyName>SmartWatch4G.Domain</AssemblyName>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>SmartWatch4G.Infrastructure</RootNamespace>
+    <AssemblyName>SmartWatch4G.Infrastructure</AssemblyName>
+    <!-- CS8981: lowercase type aliases in auto-generated Protobuf files -->
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartWatch4G.Domain\SmartWatch4G.Domain.csproj" />
+    <ProjectReference Include="..\SmartWatch4G.Application\SmartWatch4G.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+</Project>

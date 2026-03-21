@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>SmartWatch4G.Application</RootNamespace>
+    <AssemblyName>SmartWatch4G.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartWatch4G.Domain\SmartWatch4G.Domain.csproj" />
+  </ItemGroup>
+</Project>
