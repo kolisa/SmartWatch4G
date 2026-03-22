@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using SmartWatch4G.Domain.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,6 +8,7 @@ namespace SmartWatch4G.Api.Controllers;
 /// Receives binary alarm packets from wearable devices (opcode 0x12).
 /// Route: POST /alarm/upload
 /// </summary>
+[EnableRateLimiting("device-write")]
 [Route("alarm/upload")]
 [ApiController]
 public sealed class AlarmController : PacketParserBase
@@ -26,7 +28,11 @@ public sealed class AlarmController : PacketParserBase
 
     [HttpPost]
     public Task<IActionResult> UploadAlarmDataAsync(CancellationToken ct)
-        => ParseAndDispatchAsync(ct);
+    {
+        _logger.LogInformation("UploadAlarmData — entry from {RemoteIp}",
+            HttpContext.Connection.RemoteIpAddress);
+        return ParseAndDispatchAsync(ct);
+    }
 
     protected override Task OnPacketAsync(
         string deviceId,

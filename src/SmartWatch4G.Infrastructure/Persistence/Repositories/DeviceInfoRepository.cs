@@ -50,4 +50,11 @@ internal sealed class DeviceInfoRepository : IDeviceInfoRepository
         => _db.DeviceInfoRecords
                .AsNoTracking()
                .FirstOrDefaultAsync(x => x.DeviceId == deviceId, cancellationToken);
+
+    public async Task<IReadOnlyList<DeviceInfoRecord>> GetAllAsync(CancellationToken cancellationToken = default)
+        => await _db.DeviceInfoRecords
+                    .AsNoTracking()
+                    .OrderBy(x => x.DeviceId)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
 }

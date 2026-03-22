@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SmartWatch4G.Application.Utilities;
+using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 using SmartWatch4G.Domain.Interfaces.Services;
@@ -40,7 +41,41 @@ public sealed class SleepQueryService : ISleepQueryService
         _logger = logger;
     }
 
-    public async Task<SleepResult?> GetSleepResultAsync(
+    public async Task<ServiceResult<IReadOnlyList<SleepResult>>> GetSleepResultsByDateRangeAsync(
+        string deviceId,
+        string fromDate,
+        string toDate,
+        CancellationToken cancellationToken = default)
+    {
+        System.DateTime? from = DateTimeUtilities.TryParseDate(fromDate);
+        System.DateTime? to   = DateTimeUtilities.TryParseDate(toDate);
+
+        if (from is null || to is null)
+        {
+            _logger.LogWarning(
+                "GetSleepResultsByDateRangeAsync — invalid date range: {From} → {To}",
+                fromDate, toDate);
+            return ServiceResult<IReadOnlyList<SleepResult>>.Fail(
+                $"Invalid date range: '{fromDate}' → '{toDate}'", 400);
+        }
+
+        var results = new List<SleepResult>();
+        for (System.DateTime d = from.Value; d <= to.Value; d = d.AddDays(1))
+        {
+            string dateStr = d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            ServiceResult<SleepResult?> dayResult =
+                await GetSleepResultAsync(deviceId, dateStr, cancellationToken).ConfigureAwait(false);
+
+            if (dayResult.IsSuccess && dayResult.Value is not null)
+            {
+                results.Add(dayResult.Value);
+            }
+        }
+
+        return ServiceResult<IReadOnlyList<SleepResult>>.Ok(results);
+    }
+
+    public async Task<ServiceResult<SleepResult?>> GetSleepResultAsync(
         string deviceId,
         string sleepDate,
         CancellationToken cancellationToken = default)
@@ -49,7 +84,7 @@ public sealed class SleepQueryService : ISleepQueryService
         if (string.IsNullOrEmpty(prevDate))
         {
             _logger.LogWarning("Invalid sleepDate: {Date}", sleepDate);
-            return null;
+            return ServiceResult<SleepResult?>.Fail($"Invalid sleep date: '{sleepDate}'", 400);
         }
 
         IReadOnlyList<SleepDataRecord> prevSlots =
@@ -61,8 +96,9 @@ public sealed class SleepQueryService : ISleepQueryService
 
         if (prevSlots.Count == 0 && nextSlots.Count == 0)
         {
-            _logger.LogInformation("No sleep data for device {DeviceId} on {Date}", deviceId, sleepDate);
-            return null;
+            _logger.LogInformation(
+                "No sleep data for device {DeviceId} on {Date}", deviceId, sleepDate);
+            return ServiceResult<SleepResult?>.Ok(null);
         }
 
         string prevDaySleepJson = CombineSleepSlots(prevSlots);
@@ -76,7 +112,8 @@ public sealed class SleepQueryService : ISleepQueryService
         if (!int.TryParse(sleepDate.Replace("-", ""), out int recordDate))
         {
             _logger.LogWarning("Cannot parse sleepDate {Date} as int", sleepDate);
-            return null;
+            return ServiceResult<SleepResult?>.Fail(
+                $"Cannot derive record-date integer from '{sleepDate}'", 400);
         }
 
         var calcRequest = new SleepCalcRequest(
@@ -93,10 +130,11 @@ public sealed class SleepQueryService : ISleepQueryService
 
         if (calc is null)
         {
-            return null;
+            return ServiceResult<SleepResult?>.Fail(
+                $"Algo service returned no result for device {deviceId} on {sleepDate}", 502);
         }
 
-        return new SleepResult(
+        return ServiceResult<SleepResult?>.Ok(new SleepResult(
             DeviceId: deviceId,
             SleepDate: sleepDate,
             StartTime: calc.StartTime,
@@ -108,7 +146,7 @@ public sealed class SleepQueryService : ISleepQueryService
             Score: 0,
             OsahsRisk: 0,
             Spo2Score: 0,
-            SleepHeartRate: calc.HeartRate);
+            SleepHeartRate: calc.HeartRate));
     }
 
     private static string CombineSleepSlots(IReadOnlyList<SleepDataRecord> slots)
@@ -137,7 +175,7 @@ public sealed class SleepQueryService : ISleepQueryService
             }
             catch (JsonException ex)
             {
-                _logger.LogWarning("Failed to parse RRI JSON for record {Id}: {Msg}", rec.Id, ex.Message);
+                _logger.LogWarning(ex, "Failed to parse RRI JSON for record {Id}", rec.Id);
             }
         }
 
@@ -150,8 +188,12 @@ public sealed class SleepQueryService : ISleepQueryService
         foreach (var section in sections)
         {
             if (section.Type != type) continue;
-            if (System.DateTime.TryParse(section.Start, out System.DateTime start) &&
-                System.DateTime.TryParse(section.End, out System.DateTime end))
+            if (System.DateTime.TryParseExact(section.Start, "yyyy-MM-dd HH:mm:ss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out System.DateTime start) &&
+                System.DateTime.TryParseExact(section.End, "yyyy-MM-dd HH:mm:ss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out System.DateTime end))
             {
                 total += (int)(end - start).TotalMinutes;
             }

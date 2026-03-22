@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using System.Text.Json;
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Domain.Entities;
@@ -10,6 +11,7 @@ namespace SmartWatch4G.Api.Controllers;
 /// Receives JSON call-log uploads from wearable devices.
 /// Route: POST /call_log/upload
 /// </summary>
+[EnableRateLimiting("device-write")]
 [Route("call_log/upload")]
 [ApiController]
 public sealed class CallLogController : ControllerBase
@@ -28,6 +30,9 @@ public sealed class CallLogController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> UploadCallLogAsync(CancellationToken ct)
     {
+        _logger.LogInformation("UploadCallLog — entry from {RemoteIp}",
+            HttpContext.Connection.RemoteIpAddress);
+
         DeviceCallLogsDto? dto;
         try
         {
@@ -38,15 +43,56 @@ public sealed class CallLogController : ControllerBase
             dto = JsonSerializer.Deserialize<DeviceCallLogsDto>(body);
             if (dto is null)
             {
+                _logger.LogWarning("UploadCallLog — deserialization returned null");
                 return Ok(new ResponseCodeDto { ReturnCode = 10002 });
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError("CallLog deserialise error: {Message}", ex.Message);
+            _logger.LogError(ex, "UploadCallLog — deserialise error");
             return Ok(new ResponseCodeDto { ReturnCode = 10002 });
         }
 
+        if (string.IsNullOrWhiteSpace(dto.DeviceId))
+        {
+            _logger.LogWarning("UploadCallLog — DeviceId is null or empty, rejecting");
+            return Ok(new ResponseCodeDto { ReturnCode = 10002 });
+        }
+
+        IReadOnlyList<CallLogRecord> records = BuildCallLogRecords(dto);
+
+        if (records.Count > 0)
+        {
+            try
+            {
+                await _callLogRepo.AddRangeAsync(records, ct).ConfigureAwait(false);
+                _logger.LogInformation(
+                    "UploadCallLog — saved {Count} records for device {DeviceId}",
+                    records.Count, dto.DeviceId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "UploadCallLog — DB write failed for device {DeviceId}", dto.DeviceId);
+                return Ok(new ResponseCodeDto { ReturnCode = 10002 });
+            }
+        }
+        else
+        {
+            _logger.LogInformation(
+                "UploadCallLog — no records to save for device {DeviceId}", dto.DeviceId);
+        }
+
+        _logger.LogInformation("UploadCallLog — exit, device {DeviceId}", dto.DeviceId);
+        return Ok(new ResponseCodeDto { ReturnCode = 0 });
+    }
+
+    /// <summary>
+    /// Builds the flat list of <see cref="CallLogRecord"/> objects from a device payload,
+    /// keeping normal call-logs and SOS alarm call-logs separate.
+    /// </summary>
+    private static IReadOnlyList<CallLogRecord> BuildCallLogRecords(DeviceCallLogsDto dto)
+    {
         var records = new List<CallLogRecord>();
 
         if (dto.NormalCallLogs is not null)
@@ -55,7 +101,7 @@ public sealed class CallLogController : ControllerBase
             {
                 records.Add(new CallLogRecord
                 {
-                    DeviceId = dto.DeviceId ?? string.Empty,
+                    DeviceId = dto.DeviceId!,
                     CallStatus = call.Status,
                     CallNumber = call.CallNumber,
                     StartTime = call.StartTime,
@@ -74,7 +120,7 @@ public sealed class CallLogController : ControllerBase
                 {
                     records.Add(new CallLogRecord
                     {
-                        DeviceId = dto.DeviceId ?? string.Empty,
+                        DeviceId = dto.DeviceId!,
                         CallStatus = call.Status,
                         CallNumber = call.CallNumber,
                         StartTime = call.StartTime,
@@ -88,11 +134,6 @@ public sealed class CallLogController : ControllerBase
             }
         }
 
-        if (records.Count > 0)
-        {
-            await _callLogRepo.AddRangeAsync(records, ct).ConfigureAwait(false);
-        }
-
-        return Ok(new ResponseCodeDto { ReturnCode = 0 });
+        return records;
     }
 }

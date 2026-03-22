@@ -12,4 +12,10 @@ public interface ISpo2DataRepository
         string fromTime,
         string toTime,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the single most recent SpO2 reading for a device, or null if none exists.</summary>
+    Task<Spo2DataRecord?> GetLatestByDeviceAsync(string deviceId, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the most recent SpO2 reading for every device that has SpO2 data.</summary>
+    Task<IReadOnlyList<Spo2DataRecord>> GetLatestAllDevicesAsync(CancellationToken cancellationToken = default);
 }

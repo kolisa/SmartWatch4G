@@ -42,7 +42,7 @@ public abstract class PacketParserBase : ControllerBase
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to read request body: {Message}", ex.Message);
+            Logger.LogError(ex, "Failed to read request body");
             return BinaryResponse(0x01);
         }
 
@@ -85,7 +85,21 @@ public abstract class PacketParserBase : ControllerBase
             byte[] payload = new byte[payloadLen];
             Array.Copy(body, pos + FrameHeaderLength, payload, 0, payloadLen);
 
-            await OnPacketAsync(deviceId, opcode, payload, ct).ConfigureAwait(false);
+            Logger.LogInformation(
+                "Processing opcode 0x{Opcode:X4}, payload {PayloadLen} bytes for device {DeviceId}",
+                opcode, payloadLen, deviceId);
+
+            try
+            {
+                await OnPacketAsync(deviceId, opcode, payload, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex,
+                    "OnPacketAsync failed — device {DeviceId}, opcode 0x{Opcode:X4}",
+                    deviceId, opcode);
+                return BinaryResponse(0x01);
+            }
 
             pos += FrameHeaderLength + payloadLen;
         }

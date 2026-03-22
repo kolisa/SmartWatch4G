@@ -6,4 +6,5 @@ public interface IDeviceInfoRepository
 {
     Task UpsertAsync(DeviceInfoRecord record, CancellationToken cancellationToken = default);
     Task<DeviceInfoRecord?> FindByDeviceIdAsync(string deviceId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DeviceInfoRecord>> GetAllAsync(CancellationToken cancellationToken = default);
 }

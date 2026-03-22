@@ -32,4 +32,31 @@ internal sealed class Spo2DataRepository : ISpo2DataRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
+
+    public Task<Spo2DataRecord?> GetLatestByDeviceAsync(
+        string deviceId,
+        CancellationToken cancellationToken = default)
+        => _db.Spo2DataRecords
+              .AsNoTracking()
+              .Where(x => x.DeviceId == deviceId)
+              .OrderByDescending(x => x.DataTime)
+              .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Spo2DataRecord>> GetLatestAllDevicesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var latestPerDevice = _db.Spo2DataRecords
+            .GroupBy(r => r.DeviceId)
+            .Select(g => new { DeviceId = g.Key, MaxDataTime = g.Max(r => r.DataTime)! });
+
+        return await _db.Spo2DataRecords
+            .AsNoTracking()
+            .Join(latestPerDevice,
+                  r => new { r.DeviceId, r.DataTime },
+                  l => new { l.DeviceId, DataTime = l.MaxDataTime },
+                  (r, _) => r)
+            .OrderBy(r => r.DeviceId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 }
