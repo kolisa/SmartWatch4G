@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SmartWatch4G.Domain.Interfaces.Repositories;
@@ -18,8 +19,8 @@ public static class InfrastructureServiceExtensions
     {
         // ── Database ──────────────────────────────────────────────────────────
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection")));
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"))
+                   .ReplaceService<IMigrationsModelDiffer, SafeMigrationsModelDiffer>());
 
         // ── Repositories ──────────────────────────────────────────────────────
         services.AddScoped<IDeviceInfoRepository, DeviceInfoRepository>();

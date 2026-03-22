@@ -3,7 +3,8 @@
     <RootNamespace>SmartWatch4G.Infrastructure</RootNamespace>
     <AssemblyName>SmartWatch4G.Infrastructure</AssemblyName>
     <!-- CS8981: lowercase type aliases in auto-generated Protobuf files -->
-    <NoWarn>$(NoWarn);CS8981</NoWarn>
+    <!-- EF1001: intentional use of internal EF Core APIs in SafeMigrationsModelDiffer -->
+    <NoWarn>$(NoWarn);CS8981;EF1001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

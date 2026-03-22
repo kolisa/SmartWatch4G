@@ -102,12 +102,12 @@ try
     WebApplication app = builder.Build();
 
     // ── Auto-migrate on startup (skipped in Testing environment) ─────────────
-    //if (!app.Environment.IsEnvironment("Testing"))
-    //{
-    //    using IServiceScope scope = app.Services.CreateScope();
-    //    AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    //    await db.Database.MigrateAsync();
-    //}
+    if (!app.Environment.IsEnvironment("Testing"))
+    {
+        using IServiceScope scope = app.Services.CreateScope();
+        AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.MigrateAsync();
+    }
 
     // ── HTTP pipeline ─────────────────────────────────────────────────────────
     if (app.Environment.IsDevelopment())

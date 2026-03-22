@@ -1,6 +1,5 @@
 using SmartWatch4G.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace SmartWatch4G.Infrastructure.Persistence;
 
@@ -115,53 +114,5 @@ public sealed class AppDbContext : DbContext
             e.Property(x => x.DataTime).HasMaxLength(32);
         });
 
-        ApplyUtcDateTimeConvention(modelBuilder);
-    }
-
-    /// <summary>
-    /// Registers value converters for every DateTime / DateTime? property so that:
-    ///   • on write — values are normalised to UTC before persisting
-    ///   • on read  — the Kind is forced to Utc, preventing off-by-offset bugs
-    /// </summary>
-    private static void ApplyUtcDateTimeConvention(ModelBuilder modelBuilder)
-    {
-        var utcConverter = new ValueConverter<System.DateTime, System.DateTime>(
-            v => v.Kind == System.DateTimeKind.Unspecified
-                     ? System.DateTime.SpecifyKind(v, System.DateTimeKind.Utc)
-                     : v.ToUniversalTime(),
-            v => System.DateTime.SpecifyKind(v, System.DateTimeKind.Utc));
-
-        var utcNullableConverter = new ValueConverter<System.DateTime?, System.DateTime?>(
-            v => ToUtcNullable(v),
-            v => v.HasValue ? System.DateTime.SpecifyKind(v.Value, System.DateTimeKind.Utc) : null);
-
-        // EF Core 10 requires an explicit column type when a ValueConverter maps
-        // T → T (same type), otherwise MigrationsModelDiffer receives a null
-        // typeMapping and throws NullReferenceException during HasDifferences().
-        // "datetime2" is what the SQL Server provider would infer anyway.
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-        {
-            foreach (var property in entityType.GetProperties())
-            {
-                if (property.ClrType == typeof(System.DateTime))
-                {
-                    property.SetValueConverter(utcConverter);
-                    property.SetColumnType("datetime2");
-                }
-                else if (property.ClrType == typeof(System.DateTime?))
-                {
-                    property.SetValueConverter(utcNullableConverter);
-                    property.SetColumnType("datetime2");
-                }
-            }
-        }
-    }
-
-    private static System.DateTime? ToUtcNullable(System.DateTime? v)
-    {
-        if (!v.HasValue) return null;
-        return v.Value.Kind == System.DateTimeKind.Unspecified
-            ? System.DateTime.SpecifyKind(v.Value, System.DateTimeKind.Utc)
-            : v.Value.ToUniversalTime();
     }
 }

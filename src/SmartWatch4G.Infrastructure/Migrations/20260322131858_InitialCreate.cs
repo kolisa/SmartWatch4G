@@ -1,20 +1,76 @@
-using System;
-using Microsoft.EntityFrameworkCore.Infrastructure;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
-using SmartWatch4G.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace SmartWatch4G.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    [Migration("20260321000000_InitialCreate")]
-    [DbContext(typeof(AppDbContext))]
     public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "AccDataRecords",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    DataTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
+                    XValuesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    YValuesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ZValuesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    SampleCount = table.Column<int>(type: "int", nullable: false),
+                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AccDataRecords", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AlarmEventRecords",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    AlarmType = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    AlarmTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
+                    Value1 = table.Column<double>(type: "float", nullable: true),
+                    Value2 = table.Column<double>(type: "float", nullable: true),
+                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AlarmEventRecords", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CallLogRecords",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    CallStatus = table.Column<int>(type: "int", nullable: false),
+                    CallNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    StartTime = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    EndTime = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsSosAlarm = table.Column<bool>(type: "bit", nullable: false),
+                    AlarmTime = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AlarmLat = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AlarmLon = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CallLogRecords", x => x.Id);
+                });
+
             migrationBuilder.CreateTable(
                 name: "DeviceInfoRecords",
                 columns: table => new
@@ -53,7 +109,7 @@ namespace SmartWatch4G.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
                     EventTime = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
@@ -64,44 +120,44 @@ namespace SmartWatch4G.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "CallLogRecords",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
-                    CallStatus = table.Column<int>(type: "int", nullable: false),
-                    CallNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    StartTime = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    EndTime = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IsSosAlarm = table.Column<bool>(type: "bit", nullable: false),
-                    AlarmTime = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    AlarmLat = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    AlarmLon = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CallLogRecords", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AlarmEventRecords",
+                name: "EcgDataRecords",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
-                    AlarmType = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
-                    AlarmTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
-                    Value1 = table.Column<double>(type: "float", nullable: true),
-                    Value2 = table.Column<double>(type: "float", nullable: true),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    DataTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
+                    Seq = table.Column<long>(type: "bigint", nullable: false),
+                    SampleCount = table.Column<int>(type: "int", nullable: false),
+                    RawDataBase64 = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AlarmEventRecords", x => x.Id);
+                    table.PrimaryKey("PK_EcgDataRecords", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "GnssTrackRecords",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    TrackTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
+                    Longitude = table.Column<double>(type: "float", nullable: false),
+                    Latitude = table.Column<double>(type: "float", nullable: false),
+                    GpsType = table.Column<int>(type: "int", nullable: false),
+                    BatteryLevel = table.Column<int>(type: "int", nullable: true),
+                    Rssi = table.Column<int>(type: "int", nullable: true),
+                    Steps = table.Column<long>(type: "bigint", nullable: true),
+                    DistanceMetres = table.Column<float>(type: "real", nullable: true),
+                    CaloriesKcal = table.Column<float>(type: "real", nullable: true),
+                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GnssTrackRecords", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -155,42 +211,6 @@ namespace SmartWatch4G.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "SleepDataRecords",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
-                    SleepDate = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
-                    DataTime = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Seq = table.Column<long>(type: "bigint", nullable: false),
-                    SleepJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SleepDataRecords", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "EcgDataRecords",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
-                    DataTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
-                    Seq = table.Column<long>(type: "bigint", nullable: false),
-                    SampleCount = table.Column<int>(type: "int", nullable: false),
-                    RawDataBase64 = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_EcgDataRecords", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "RriDataRecords",
                 columns: table => new
                 {
@@ -209,26 +229,21 @@ namespace SmartWatch4G.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "GnssTrackRecords",
+                name: "SleepDataRecords",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
-                    TrackTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
-                    Longitude = table.Column<double>(type: "float", nullable: false),
-                    Latitude = table.Column<double>(type: "float", nullable: false),
-                    GpsType = table.Column<int>(type: "int", nullable: false),
-                    BatteryLevel = table.Column<int>(type: "int", nullable: true),
-                    Rssi = table.Column<int>(type: "int", nullable: true),
-                    Steps = table.Column<long>(type: "bigint", nullable: true),
-                    DistanceMetres = table.Column<float>(type: "real", nullable: true),
-                    CaloriesKcal = table.Column<float>(type: "real", nullable: true),
+                    SleepDate = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
+                    DataTime = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Seq = table.Column<long>(type: "bigint", nullable: false),
+                    SleepJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_GnssTrackRecords", x => x.Id);
+                    table.PrimaryKey("PK_SleepDataRecords", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -250,26 +265,20 @@ namespace SmartWatch4G.Infrastructure.Migrations
                     table.PrimaryKey("PK_Spo2DataRecords", x => x.Id);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "AccDataRecords",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DeviceId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
-                    DataTime = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
-                    XValuesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    YValuesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ZValuesJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SampleCount = table.Column<int>(type: "int", nullable: false),
-                    ReceivedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AccDataRecords", x => x.Id);
-                });
+            migrationBuilder.CreateIndex(
+                name: "IX_AccDataRecords_DeviceId_DataTime",
+                table: "AccDataRecords",
+                columns: new[] { "DeviceId", "DataTime" });
 
-            // Indexes
+            migrationBuilder.CreateIndex(
+                name: "IX_AlarmEventRecords_DeviceId_AlarmType_AlarmTime",
+                table: "AlarmEventRecords",
+                columns: new[] { "DeviceId", "AlarmType", "AlarmTime" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CallLogRecords_DeviceId_IsSosAlarm",
+                table: "CallLogRecords",
+                columns: new[] { "DeviceId", "IsSosAlarm" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceInfoRecords_DeviceId",
@@ -283,33 +292,8 @@ namespace SmartWatch4G.Infrastructure.Migrations
                 columns: new[] { "DeviceId", "ReceivedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_CallLogRecords_DeviceId_IsSosAlarm",
-                table: "CallLogRecords",
-                columns: new[] { "DeviceId", "IsSosAlarm" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AlarmEventRecords_DeviceId_AlarmType_AlarmTime",
-                table: "AlarmEventRecords",
-                columns: new[] { "DeviceId", "AlarmType", "AlarmTime" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_HealthDataRecords_DeviceId_DataTime",
-                table: "HealthDataRecords",
-                columns: new[] { "DeviceId", "DataTime" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_SleepDataRecords_DeviceId_SleepDate_Seq",
-                table: "SleepDataRecords",
-                columns: new[] { "DeviceId", "SleepDate", "Seq" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_EcgDataRecords_DeviceId_DataTime",
                 table: "EcgDataRecords",
-                columns: new[] { "DeviceId", "DataTime" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_RriDataRecords_DeviceId_DataTime",
-                table: "RriDataRecords",
                 columns: new[] { "DeviceId", "DataTime" });
 
             migrationBuilder.CreateIndex(
@@ -318,30 +302,61 @@ namespace SmartWatch4G.Infrastructure.Migrations
                 columns: new[] { "DeviceId", "TrackTime" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Spo2DataRecords_DeviceId_DataTime",
-                table: "Spo2DataRecords",
+                name: "IX_HealthDataRecords_DeviceId_DataTime",
+                table: "HealthDataRecords",
                 columns: new[] { "DeviceId", "DataTime" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AccDataRecords_DeviceId_DataTime",
-                table: "AccDataRecords",
+                name: "IX_RriDataRecords_DeviceId_DataTime",
+                table: "RriDataRecords",
+                columns: new[] { "DeviceId", "DataTime" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SleepDataRecords_DeviceId_SleepDate_Seq",
+                table: "SleepDataRecords",
+                columns: new[] { "DeviceId", "SleepDate", "Seq" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Spo2DataRecords_DeviceId_DataTime",
+                table: "Spo2DataRecords",
                 columns: new[] { "DeviceId", "DataTime" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "AccDataRecords");
-            migrationBuilder.DropTable(name: "Spo2DataRecords");
-            migrationBuilder.DropTable(name: "GnssTrackRecords");
-            migrationBuilder.DropTable(name: "RriDataRecords");
-            migrationBuilder.DropTable(name: "EcgDataRecords");
-            migrationBuilder.DropTable(name: "SleepDataRecords");
-            migrationBuilder.DropTable(name: "HealthDataRecords");
-            migrationBuilder.DropTable(name: "AlarmEventRecords");
-            migrationBuilder.DropTable(name: "CallLogRecords");
-            migrationBuilder.DropTable(name: "DeviceStatusRecords");
-            migrationBuilder.DropTable(name: "DeviceInfoRecords");
+            migrationBuilder.DropTable(
+                name: "AccDataRecords");
+
+            migrationBuilder.DropTable(
+                name: "AlarmEventRecords");
+
+            migrationBuilder.DropTable(
+                name: "CallLogRecords");
+
+            migrationBuilder.DropTable(
+                name: "DeviceInfoRecords");
+
+            migrationBuilder.DropTable(
+                name: "DeviceStatusRecords");
+
+            migrationBuilder.DropTable(
+                name: "EcgDataRecords");
+
+            migrationBuilder.DropTable(
+                name: "GnssTrackRecords");
+
+            migrationBuilder.DropTable(
+                name: "HealthDataRecords");
+
+            migrationBuilder.DropTable(
+                name: "RriDataRecords");
+
+            migrationBuilder.DropTable(
+                name: "SleepDataRecords");
+
+            migrationBuilder.DropTable(
+                name: "Spo2DataRecords");
         }
     }
 }
