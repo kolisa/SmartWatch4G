@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -20,14 +21,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/spo2")]
 public sealed class Spo2QueryController : ControllerBase
 {
-    private readonly ISpo2DataRepository _spo2Repo;
+    private readonly ISpo2QueryService _spo2Service;
     private readonly ILogger<Spo2QueryController> _logger;
 
     public Spo2QueryController(
-        ISpo2DataRepository spo2Repo,
+        ISpo2QueryService spo2Service,
         ILogger<Spo2QueryController> logger)
     {
-        _spo2Repo = spo2Repo;
+        _spo2Service = spo2Service;
         _logger = logger;
     }
 
@@ -47,14 +48,13 @@ public sealed class Spo2QueryController : ControllerBase
         _logger.LogInformation(
             "GetSpo2 — entry, device: {DeviceId}, date: {Date}, from: {From}, to: {To}",
             deviceId, date, from, to);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiListResponse<Spo2ReadingDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<Spo2DataRecord> records;
+        IReadOnlyList<Spo2ReadingDto> data;
         string filterDesc;
 
         try
@@ -69,14 +69,13 @@ public sealed class Spo2QueryController : ControllerBase
                 }
 
                 filterDesc = $"{from} → {to}";
-                records = await _spo2Repo.GetByDeviceAndDateRangeAsync(deviceId, from, to, ct)
+                data = await _spo2Service.GetByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
             else if (DateTimeUtilities.IsValidDate(date))
             {
-                (string dayFrom, string dayTo) = DateTimeUtilities.ToDayRange(date);
                 filterDesc = $"date {date}";
-                records = await _spo2Repo.GetByDeviceAndDateRangeAsync(deviceId, dayFrom, dayTo, ct)
+                data = await _spo2Service.GetByDateAsync(deviceId, date!, tz, ct)
                     .ConfigureAwait(false);
             }
             else
@@ -90,16 +89,6 @@ public sealed class Spo2QueryController : ControllerBase
             _logger.LogError(ex, "GetSpo2 — DB read failed for device {DeviceId}", deviceId);
             return StatusCode(500, new ApiListResponse<Spo2ReadingDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new Spo2ReadingDto
-        {
-            DeviceId = r.DeviceId ?? string.Empty,
-            DataTime = DateTimeUtilities.LocalizeTimestamp(r.DataTime, tzInfo),
-            Spo2 = r.Spo2,
-            HeartRate = r.HeartRate,
-            Perfusion = r.Perfusion,
-            Touch = r.Touch
-        }).ToList();
 
         _logger.LogInformation(
             "GetSpo2 — exit, device: {DeviceId}, filter: [{Filter}], count: {Count}",
@@ -118,17 +107,16 @@ public sealed class Spo2QueryController : ControllerBase
     public async Task<IActionResult> GetSpo2LatestAsync(string deviceId, [FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetSpo2Latest — entry, device: {DeviceId}", deviceId);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiItemResponse<Spo2ReadingDto> { ReturnCode = 400 });
         }
 
-        Spo2DataRecord? record;
+        Spo2ReadingDto? item;
         try
         {
-            record = await _spo2Repo.GetLatestByDeviceAsync(deviceId, ct).ConfigureAwait(false);
+            item = await _spo2Service.GetLatestAsync(deviceId, tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -137,7 +125,7 @@ public sealed class Spo2QueryController : ControllerBase
             return StatusCode(500, new ApiItemResponse<Spo2ReadingDto> { ReturnCode = 500 });
         }
 
-        if (record is null)
+        if (item is null)
         {
             _logger.LogInformation("GetSpo2Latest — no data for device {DeviceId}", deviceId);
             return NotFound(new ApiItemResponse<Spo2ReadingDto> { ReturnCode = 404 });
@@ -145,20 +133,12 @@ public sealed class Spo2QueryController : ControllerBase
 
         _logger.LogInformation(
             "GetSpo2Latest — exit, device: {DeviceId}, dataTime: {DataTime}",
-            deviceId, record.DataTime);
+            deviceId, item.DataTime);
 
         return Ok(new ApiItemResponse<Spo2ReadingDto>
         {
             ReturnCode = 0,
-            Data = new Spo2ReadingDto
-            {
-                DeviceId = record.DeviceId ?? string.Empty,
-                DataTime = DateTimeUtilities.LocalizeTimestamp(record.DataTime, tzInfo),
-                Spo2 = record.Spo2,
-                HeartRate = record.HeartRate,
-                Perfusion = record.Perfusion,
-                Touch = record.Touch
-            }
+            Data = item
         });
     }
 }

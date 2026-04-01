@@ -1,11 +1,12 @@
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Serialization;
-using SmartWatch4G.Domain.Interfaces.Services;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
+using SmartWatch4G.Domain.Interfaces.Services;
 
 namespace SmartWatch4G.Infrastructure.Services;
 
@@ -223,10 +224,16 @@ public sealed class WownCommandClient : IWownCommandClient
             alarms = cmd.Alarms.Select(a => new
             {
                 repeat = a.Repeat,
-                monday = a.Monday, tuesday = a.Tuesday, wednesday = a.Wednesday,
-                thursday = a.Thursday, friday = a.Friday,
-                saturday = a.Saturday, sunday = a.Sunday,
-                hour = a.Hour, minute = a.Minute, title = a.Title
+                monday = a.Monday,
+                tuesday = a.Tuesday,
+                wednesday = a.Wednesday,
+                thursday = a.Thursday,
+                friday = a.Friday,
+                saturday = a.Saturday,
+                sunday = a.Sunday,
+                hour = a.Hour,
+                minute = a.Minute,
+                title = a.Title
             })
         };
         return PostAsync("/entservice2/clockalarm/set", body, ct);
@@ -243,11 +250,17 @@ public sealed class WownCommandClient : IWownCommandClient
             sedentaries = cmd.Sedentaries.Select(s => new
             {
                 repeat = s.Repeat,
-                monday = s.Monday, tuesday = s.Tuesday, wednesday = s.Wednesday,
-                thursday = s.Thursday, friday = s.Friday,
-                saturday = s.Saturday, sunday = s.Sunday,
-                start_hour = s.StartHour, end_hour = s.EndHour,
-                duration = s.Duration, threshold = s.Threshold
+                monday = s.Monday,
+                tuesday = s.Tuesday,
+                wednesday = s.Wednesday,
+                thursday = s.Thursday,
+                friday = s.Friday,
+                saturday = s.Saturday,
+                sunday = s.Sunday,
+                start_hour = s.StartHour,
+                end_hour = s.EndHour,
+                duration = s.Duration,
+                threshold = s.Threshold
             })
         };
         return PostAsync("/entservice3/sedentary/set", body, ct);
@@ -313,8 +326,10 @@ public sealed class WownCommandClient : IWownCommandClient
         var body = new
         {
             device_id = cmd.DeviceId,
-            sbp_band = cmd.SbpBand, dbp_band = cmd.DbpBand,
-            sbp_meter = cmd.SbpMeter, dbp_meter = cmd.DbpMeter
+            sbp_band = cmd.SbpBand,
+            dbp_band = cmd.DbpBand,
+            sbp_meter = cmd.SbpMeter,
+            dbp_meter = cmd.DbpMeter
         };
         return PostAsync("/entservice/cmd/bpadjust", body, ct);
     }

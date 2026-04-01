@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 using SmartWatch4G.Domain.Interfaces.Services;
 using SmartWatch4G.Infrastructure.Persistence;
@@ -57,6 +59,17 @@ public static class InfrastructureServiceExtensions
         // ── Domain service implementations ────────────────────────────────────
         services.AddScoped<ISleepQueryService, SleepQueryService>();
         services.AddScoped<IProtobufPacketHandler, ProtobufPacketDispatcher>();
+
+        // ── Application query services (API layer depends on these, never on repositories) ──
+        services.AddScoped<IDeviceQueryService, DeviceQueryService>();
+        services.AddScoped<IHealthQueryService, HealthQueryService>();
+        services.AddScoped<IAlarmQueryService, AlarmQueryService>();
+        services.AddScoped<ILocationQueryService, LocationQueryService>();
+        services.AddScoped<ICallLogQueryService, CallLogQueryService>();
+        services.AddScoped<ISpo2QueryService, Spo2QueryService>();
+        services.AddScoped<IEcgQueryService, EcgQueryService>();
+        services.AddScoped<IRriQueryService, RriQueryService>();
+        services.AddScoped<IAccelerometerQueryService, AccelerometerQueryService>();
 
         // ── Processors (scoped — share same DbContext per request) ────────────
         services.AddScoped<HistoryDataProcessor>();

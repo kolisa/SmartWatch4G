@@ -1,9 +1,10 @@
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text.Json.Serialization;
-using SmartWatch4G.Domain.Interfaces.Services;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
+using SmartWatch4G.Domain.Interfaces.Services;
 
 namespace SmartWatch4G.Infrastructure.Services;
 

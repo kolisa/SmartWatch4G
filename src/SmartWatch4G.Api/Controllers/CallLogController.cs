@@ -1,9 +1,11 @@
-using Microsoft.AspNetCore.RateLimiting;
 using System.Text.Json;
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
-using Microsoft.AspNetCore.Mvc;
 
 namespace SmartWatch4G.Api.Controllers;
 

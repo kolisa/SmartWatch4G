@@ -1,5 +1,6 @@
-using SmartWatch4G.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+
+using SmartWatch4G.Domain.Entities;
 
 namespace SmartWatch4G.Infrastructure.Persistence;
 

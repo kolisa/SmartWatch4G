@@ -1,6 +1,7 @@
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Domain.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Domain.Interfaces.Services;
 
 namespace SmartWatch4G.Api.Controllers;
 

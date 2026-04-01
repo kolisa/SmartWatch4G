@@ -1,10 +1,12 @@
 using System.Text.Json;
+
+using Microsoft.Extensions.Logging;
+
 using SmartWatch4G.Application.Utilities;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 using SmartWatch4G.Domain.Interfaces.Services;
-using Microsoft.Extensions.Logging;
 
 namespace SmartWatch4G.Infrastructure.Services;
 
@@ -48,7 +50,7 @@ public sealed class SleepQueryService : ISleepQueryService
         CancellationToken cancellationToken = default)
     {
         System.DateTime? from = DateTimeUtilities.TryParseDate(fromDate);
-        System.DateTime? to   = DateTimeUtilities.TryParseDate(toDate);
+        System.DateTime? to = DateTimeUtilities.TryParseDate(toDate);
 
         if (from is null || to is null)
         {

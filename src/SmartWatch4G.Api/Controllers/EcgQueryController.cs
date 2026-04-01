@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -18,14 +19,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/ecg")]
 public sealed class EcgQueryController : ControllerBase
 {
-    private readonly IHealthDataRepository _healthRepo;
+    private readonly IEcgQueryService _ecgService;
     private readonly ILogger<EcgQueryController> _logger;
 
     public EcgQueryController(
-        IHealthDataRepository healthRepo,
+        IEcgQueryService ecgService,
         ILogger<EcgQueryController> logger)
     {
-        _healthRepo = healthRepo;
+        _ecgService = ecgService;
         _logger = logger;
     }
 
@@ -39,7 +40,6 @@ public sealed class EcgQueryController : ControllerBase
     {
         _logger.LogInformation(
             "GetEcg — entry, device: {DeviceId}, date: {Date}", deviceId, date);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
         {
@@ -48,10 +48,10 @@ public sealed class EcgQueryController : ControllerBase
             return BadRequest(new ApiListResponse<EcgRecordDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<EcgDataRecord> records;
+        IReadOnlyList<EcgRecordDto> data;
         try
         {
-            records = await _healthRepo.GetEcgByDeviceAndDateAsync(deviceId, date, ct)
+            data = await _ecgService.GetByDateAsync(deviceId, date, tz, ct)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -60,15 +60,6 @@ public sealed class EcgQueryController : ControllerBase
                 "GetEcg — DB read failed for device {DeviceId}, date {Date}", deviceId, date);
             return StatusCode(500, new ApiListResponse<EcgRecordDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new EcgRecordDto
-        {
-            DeviceId = r.DeviceId ?? string.Empty,
-            DataTime = DateTimeUtilities.LocalizeTimestamp(r.DataTime, tzInfo),
-            Seq = r.Seq,
-            SampleCount = r.SampleCount,
-            RawDataBase64 = r.RawDataBase64
-        }).ToList();
 
         _logger.LogInformation(
             "GetEcg — exit, device: {DeviceId}, date: {Date}, count: {Count}",

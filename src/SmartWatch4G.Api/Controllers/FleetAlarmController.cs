@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -20,14 +21,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetAlarmController : ControllerBase
 {
-    private readonly IAlarmRepository _alarmRepo;
+    private readonly IAlarmQueryService _alarmService;
     private readonly ILogger<FleetAlarmController> _logger;
 
     public FleetAlarmController(
-        IAlarmRepository alarmRepo,
+        IAlarmQueryService alarmService,
         ILogger<FleetAlarmController> logger)
     {
-        _alarmRepo = alarmRepo;
+        _alarmService = alarmService;
         _logger = logger;
     }
 
@@ -39,7 +40,6 @@ public sealed class FleetAlarmController : ControllerBase
         CancellationToken ct)
     {
         _logger.LogInformation("GetFleetAlarms — entry, date: {Date}", date);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (!DateTimeUtilities.IsValidDate(date))
         {
@@ -47,10 +47,10 @@ public sealed class FleetAlarmController : ControllerBase
             return BadRequest(new ApiListResponse<AlarmEventDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<AlarmEventRecord> records;
+        IReadOnlyList<AlarmEventDto> data;
         try
         {
-            records = await _alarmRepo.GetAllDevicesAndDateAsync(date, ct).ConfigureAwait(false);
+            data = await _alarmService.GetAllDevicesAndDateAsync(date, tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -58,7 +58,6 @@ public sealed class FleetAlarmController : ControllerBase
             return StatusCode(500, new ApiListResponse<AlarmEventDto> { ReturnCode = 500 });
         }
 
-        var data = records.Select(r => MapToDto(r, tzInfo)).ToList();
         _logger.LogInformation("GetFleetAlarms — exit, date: {Date}, count: {Count}", date, data.Count);
         return Ok(new ApiListResponse<AlarmEventDto> { ReturnCode = 0, Count = data.Count, Data = data });
     }
@@ -68,12 +67,11 @@ public sealed class FleetAlarmController : ControllerBase
     public async Task<IActionResult> GetFleetAlarmsLatestAsync([FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetFleetAlarmsLatest — entry");
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
-        IReadOnlyList<AlarmEventRecord> records;
+        IReadOnlyList<AlarmEventDto> data;
         try
         {
-            records = await _alarmRepo.GetLatestAllDevicesAsync(ct).ConfigureAwait(false);
+            data = await _alarmService.GetLatestAllDevicesAsync(tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -81,19 +79,7 @@ public sealed class FleetAlarmController : ControllerBase
             return StatusCode(500, new ApiListResponse<AlarmEventDto> { ReturnCode = 500 });
         }
 
-        var data = records.Select(r => MapToDto(r, tzInfo)).ToList();
         _logger.LogInformation("GetFleetAlarmsLatest — exit, {Count} devices", data.Count);
         return Ok(new ApiListResponse<AlarmEventDto> { ReturnCode = 0, Count = data.Count, Data = data });
     }
-
-    private static AlarmEventDto MapToDto(AlarmEventRecord r, TimeZoneInfo? tz) => new()
-    {
-        DeviceId   = r.DeviceId ?? string.Empty,
-        AlarmType  = r.AlarmType,
-        AlarmTime  = DateTimeUtilities.LocalizeTimestamp(r.AlarmTime, tz),
-        Value1     = r.Value1,
-        Value2     = r.Value2,
-        Notes      = r.Notes,
-        ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tz)
-    };
 }

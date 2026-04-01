@@ -1,5 +1,5 @@
-using System;
 using SmartWatch4G.Application.Utilities;
+
 using Xunit;
 
 namespace SmartWatch4G.UnitTests;

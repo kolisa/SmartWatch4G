@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -18,14 +19,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/rri")]
 public sealed class RriQueryController : ControllerBase
 {
-    private readonly IRriDataRepository _rriRepo;
+    private readonly IRriQueryService _rriService;
     private readonly ILogger<RriQueryController> _logger;
 
     public RriQueryController(
-        IRriDataRepository rriRepo,
+        IRriQueryService rriService,
         ILogger<RriQueryController> logger)
     {
-        _rriRepo = rriRepo;
+        _rriService = rriService;
         _logger = logger;
     }
 
@@ -39,7 +40,6 @@ public sealed class RriQueryController : ControllerBase
     {
         _logger.LogInformation(
             "GetRri — entry, device: {DeviceId}, date: {Date}", deviceId, date);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
         {
@@ -48,10 +48,10 @@ public sealed class RriQueryController : ControllerBase
             return BadRequest(new ApiListResponse<RriReadingDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<RriDataRecord> records;
+        IReadOnlyList<RriReadingDto> data;
         try
         {
-            records = await _rriRepo.GetByDeviceAndDateAsync(deviceId, date, ct)
+            data = await _rriService.GetByDateAsync(deviceId, date, tz, ct)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -60,15 +60,6 @@ public sealed class RriQueryController : ControllerBase
                 "GetRri — DB read failed for device {DeviceId}, date {Date}", deviceId, date);
             return StatusCode(500, new ApiListResponse<RriReadingDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new RriReadingDto
-        {
-            DeviceId = r.DeviceId ?? string.Empty,
-            DataTime = DateTimeUtilities.LocalizeTimestamp(r.DataTime, tzInfo),
-            Seq = r.Seq,
-            SampleCount = r.SampleCount,
-            RriValuesJson = r.RriValuesJson
-        }).ToList();
 
         _logger.LogInformation(
             "GetRri — exit, device: {DeviceId}, date: {Date}, count: {Count}",

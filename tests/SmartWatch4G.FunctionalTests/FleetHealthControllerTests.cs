@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+
 using SmartWatch4G.Application.DTOs;
+
 using Xunit;
 
 namespace SmartWatch4G.FunctionalTests;

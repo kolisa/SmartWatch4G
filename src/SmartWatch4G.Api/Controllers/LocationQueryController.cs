@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -26,14 +27,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/location")]
 public sealed class LocationQueryController : ControllerBase
 {
-    private readonly IGnssTrackRepository _gnssRepo;
+    private readonly ILocationQueryService _locationService;
     private readonly ILogger<LocationQueryController> _logger;
 
     public LocationQueryController(
-        IGnssTrackRepository gnssRepo,
+        ILocationQueryService locationService,
         ILogger<LocationQueryController> logger)
     {
-        _gnssRepo = gnssRepo;
+        _locationService = locationService;
         _logger = logger;
     }
 
@@ -54,14 +55,13 @@ public sealed class LocationQueryController : ControllerBase
         _logger.LogInformation(
             "GetLocation — entry, device: {DeviceId}, minutes: {Minutes}, from: {From}, to: {To}, date: {Date}",
             deviceId, minutes, from, to, date);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiListResponse<LocationPointDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<GnssTrackRecord> records;
+        IReadOnlyList<LocationPointDto> data;
         string filterDesc;
 
         try
@@ -74,7 +74,7 @@ public sealed class LocationQueryController : ControllerBase
                 }
 
                 filterDesc = $"last {minutes.Value} min";
-                records = await _gnssRepo.GetRecentByDeviceAsync(deviceId, minutes.Value, ct)
+                data = await _locationService.GetRecentAsync(deviceId, minutes.Value, tz, ct)
                     .ConfigureAwait(false);
             }
             else if (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
@@ -87,13 +87,13 @@ public sealed class LocationQueryController : ControllerBase
                 }
 
                 filterDesc = $"{from} → {to}";
-                records = await _gnssRepo.GetByDeviceAndTimeRangeAsync(deviceId, from, to, ct)
+                data = await _locationService.GetByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
             else if (DateTimeUtilities.IsValidDate(date))
             {
                 filterDesc = $"date {date}";
-                records = await _gnssRepo.GetByDeviceAndDateAsync(deviceId, date!, ct)
+                data = await _locationService.GetByDateAsync(deviceId, date!, tz, ct)
                     .ConfigureAwait(false);
             }
             else
@@ -108,8 +108,6 @@ public sealed class LocationQueryController : ControllerBase
             _logger.LogError(ex, "GetLocation — DB read failed for device {DeviceId}", deviceId);
             return StatusCode(500, new ApiListResponse<LocationPointDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => MapToDto(r, tzInfo)).ToList();
 
         _logger.LogInformation(
             "GetLocation — exit, device: {DeviceId}, filter: [{Filter}], count: {Count}",
@@ -128,17 +126,16 @@ public sealed class LocationQueryController : ControllerBase
     public async Task<IActionResult> GetLocationLatestAsync(string deviceId, [FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetLocationLatest — entry, device: {DeviceId}", deviceId);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiItemResponse<LocationPointDto> { ReturnCode = 400 });
         }
 
-        GnssTrackRecord? record;
+        LocationPointDto? item;
         try
         {
-            record = await _gnssRepo.GetLatestByDeviceAsync(deviceId, ct).ConfigureAwait(false);
+            item = await _locationService.GetLatestAsync(deviceId, tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -147,7 +144,7 @@ public sealed class LocationQueryController : ControllerBase
             return StatusCode(500, new ApiItemResponse<LocationPointDto> { ReturnCode = 500 });
         }
 
-        if (record is null)
+        if (item is null)
         {
             _logger.LogInformation("GetLocationLatest — no data for device {DeviceId}", deviceId);
             return NotFound(new ApiItemResponse<LocationPointDto> { ReturnCode = 404 });
@@ -155,22 +152,8 @@ public sealed class LocationQueryController : ControllerBase
 
         _logger.LogInformation(
             "GetLocationLatest — exit, device: {DeviceId}, trackTime: {TrackTime}",
-            deviceId, record.TrackTime);
+            deviceId, item.TrackTime);
 
-        return Ok(new ApiItemResponse<LocationPointDto> { ReturnCode = 0, Data = MapToDto(record, tzInfo) });
+        return Ok(new ApiItemResponse<LocationPointDto> { ReturnCode = 0, Data = item });
     }
-
-    private static LocationPointDto MapToDto(GnssTrackRecord r, TimeZoneInfo? tz) => new()
-    {
-        DeviceId = r.DeviceId ?? string.Empty,
-        TrackTime = DateTimeUtilities.LocalizeTimestamp(r.TrackTime, tz),
-        Longitude = r.Longitude,
-        Latitude = r.Latitude,
-        GpsType = r.GpsType,
-        BatteryLevel = r.BatteryLevel,
-        Rssi = r.Rssi,
-        Steps = r.Steps,
-        DistanceMetres = r.DistanceMetres,
-        CaloriesKcal = r.CaloriesKcal
-    };
 }

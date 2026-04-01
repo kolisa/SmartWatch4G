@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -20,14 +21,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/alarms")]
 public sealed class AlarmQueryController : ControllerBase
 {
-    private readonly IAlarmRepository _alarmRepo;
+    private readonly IAlarmQueryService _alarmService;
     private readonly ILogger<AlarmQueryController> _logger;
 
     public AlarmQueryController(
-        IAlarmRepository alarmRepo,
+        IAlarmQueryService alarmService,
         ILogger<AlarmQueryController> logger)
     {
-        _alarmRepo = alarmRepo;
+        _alarmService = alarmService;
         _logger = logger;
     }
 
@@ -47,14 +48,13 @@ public sealed class AlarmQueryController : ControllerBase
         _logger.LogInformation(
             "GetAlarms — entry, device: {DeviceId}, date: {Date}, from: {From}, to: {To}",
             deviceId, date, from, to);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiListResponse<AlarmEventDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<AlarmEventRecord> records;
+        IReadOnlyList<AlarmEventDto> data;
         string filterDesc;
 
         try
@@ -69,13 +69,13 @@ public sealed class AlarmQueryController : ControllerBase
                 }
 
                 filterDesc = $"{from} → {to}";
-                records = await _alarmRepo.GetByDeviceAndTimeRangeAsync(deviceId, from, to, ct)
+                data = await _alarmService.GetByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
             else if (DateTimeUtilities.IsValidDate(date))
             {
                 filterDesc = $"date {date}";
-                records = await _alarmRepo.GetByDeviceAndDateAsync(deviceId, date!, ct)
+                data = await _alarmService.GetByDateAsync(deviceId, date!, tz, ct)
                     .ConfigureAwait(false);
             }
             else
@@ -89,8 +89,6 @@ public sealed class AlarmQueryController : ControllerBase
             _logger.LogError(ex, "GetAlarms — DB read failed for device {DeviceId}", deviceId);
             return StatusCode(500, new ApiListResponse<AlarmEventDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => MapToDto(r, tzInfo)).ToList();
 
         _logger.LogInformation(
             "GetAlarms — exit, device: {DeviceId}, filter: [{Filter}], count: {Count}",
@@ -109,17 +107,16 @@ public sealed class AlarmQueryController : ControllerBase
     public async Task<IActionResult> GetAlarmLatestAsync(string deviceId, [FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetAlarmLatest — entry, device: {DeviceId}", deviceId);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiItemResponse<AlarmEventDto> { ReturnCode = 400 });
         }
 
-        AlarmEventRecord? record;
+        AlarmEventDto? item;
         try
         {
-            record = await _alarmRepo.GetLatestByDeviceAsync(deviceId, ct).ConfigureAwait(false);
+            item = await _alarmService.GetLatestAsync(deviceId, tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -128,7 +125,7 @@ public sealed class AlarmQueryController : ControllerBase
             return StatusCode(500, new ApiItemResponse<AlarmEventDto> { ReturnCode = 500 });
         }
 
-        if (record is null)
+        if (item is null)
         {
             _logger.LogInformation("GetAlarmLatest — no data for device {DeviceId}", deviceId);
             return NotFound(new ApiItemResponse<AlarmEventDto> { ReturnCode = 404 });
@@ -136,23 +133,12 @@ public sealed class AlarmQueryController : ControllerBase
 
         _logger.LogInformation(
             "GetAlarmLatest — exit, device: {DeviceId}, alarmType: {AlarmType}",
-            deviceId, record.AlarmType);
+            deviceId, item.AlarmType);
 
         return Ok(new ApiItemResponse<AlarmEventDto>
         {
             ReturnCode = 0,
-            Data = MapToDto(record, tzInfo)
+            Data = item
         });
     }
-
-    private static AlarmEventDto MapToDto(AlarmEventRecord r, TimeZoneInfo? tz) => new()
-    {
-        DeviceId  = r.DeviceId ?? string.Empty,
-        AlarmType = r.AlarmType,
-        AlarmTime = DateTimeUtilities.LocalizeTimestamp(r.AlarmTime, tz),
-        Value1    = r.Value1,
-        Value2    = r.Value2,
-        Notes     = r.Notes,
-        ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tz)
-    };
 }

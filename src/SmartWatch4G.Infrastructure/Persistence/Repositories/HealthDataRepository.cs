@@ -1,7 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
-using SmartWatch4G.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace SmartWatch4G.Infrastructure.Persistence.Repositories;
 
@@ -108,7 +108,7 @@ internal sealed class HealthDataRepository : IHealthDataRepository
         CancellationToken cancellationToken = default)
     {
         string from = $"{date} 00:00:00";
-        string to   = $"{date} 23:59:59";
+        string to = $"{date} 23:59:59";
 
         return await _db.HealthDataRecords
             .AsNoTracking()

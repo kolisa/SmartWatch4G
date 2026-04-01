@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -18,14 +19,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetCallLogController : ControllerBase
 {
-    private readonly ICallLogRepository _callLogRepo;
+    private readonly ICallLogQueryService _callLogService;
     private readonly ILogger<FleetCallLogController> _logger;
 
     public FleetCallLogController(
-        ICallLogRepository callLogRepo,
+        ICallLogQueryService callLogService,
         ILogger<FleetCallLogController> logger)
     {
-        _callLogRepo = callLogRepo;
+        _callLogService = callLogService;
         _logger = logger;
     }
 
@@ -37,7 +38,6 @@ public sealed class FleetCallLogController : ControllerBase
         CancellationToken ct)
     {
         _logger.LogInformation("GetFleetCallLogs — entry, date: {Date}", date);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (!DateTimeUtilities.IsValidDate(date))
         {
@@ -45,30 +45,16 @@ public sealed class FleetCallLogController : ControllerBase
             return BadRequest(new ApiListResponse<CallLogItemDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<CallLogRecord> records;
+        IReadOnlyList<CallLogItemDto> data;
         try
         {
-            records = await _callLogRepo.GetAllDevicesAndDateAsync(date, ct).ConfigureAwait(false);
+            data = await _callLogService.GetAllDevicesAndDateAsync(date, tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetFleetCallLogs — DB read failed for date {Date}", date);
             return StatusCode(500, new ApiListResponse<CallLogItemDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new CallLogItemDto
-        {
-            DeviceId   = r.DeviceId,
-            CallStatus = r.CallStatus,
-            CallNumber = r.CallNumber,
-            StartTime  = DateTimeUtilities.LocalizeTimestamp(r.StartTime, tzInfo),
-            EndTime    = DateTimeUtilities.LocalizeTimestamp(r.EndTime, tzInfo),
-            IsSosAlarm = r.IsSosAlarm,
-            AlarmTime  = DateTimeUtilities.LocalizeTimestamp(r.AlarmTime, tzInfo),
-            AlarmLat   = r.AlarmLat,
-            AlarmLon   = r.AlarmLon,
-            ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tzInfo)
-        }).ToList();
 
         _logger.LogInformation(
             "GetFleetCallLogs — exit, date: {Date}, count: {Count}", date, data.Count);

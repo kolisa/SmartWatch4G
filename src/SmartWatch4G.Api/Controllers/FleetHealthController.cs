@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -20,14 +21,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetHealthController : ControllerBase
 {
-    private readonly IHealthDataRepository _healthRepo;
+    private readonly IHealthQueryService _healthService;
     private readonly ILogger<FleetHealthController> _logger;
 
     public FleetHealthController(
-        IHealthDataRepository healthRepo,
+        IHealthQueryService healthService,
         ILogger<FleetHealthController> logger)
     {
-        _healthRepo = healthRepo;
+        _healthService = healthService;
         _logger = logger;
     }
 
@@ -36,12 +37,11 @@ public sealed class FleetHealthController : ControllerBase
     public async Task<IActionResult> GetFleetHealthLatestAsync([FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetFleetHealthLatest — entry");
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
-        IReadOnlyList<HealthDataRecord> records;
+        IReadOnlyList<HealthSnapshotDto> data;
         try
         {
-            records = await _healthRepo.GetLatestAllDevicesAsync(ct).ConfigureAwait(false);
+            data = await _healthService.GetLatestSnapshotAllDevicesAsync(tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -49,7 +49,6 @@ public sealed class FleetHealthController : ControllerBase
             return StatusCode(500, new ApiListResponse<HealthSnapshotDto> { ReturnCode = 500 });
         }
 
-        var data = records.Select(r => MapToSnapshotDto(r, tzInfo)).ToList();
         _logger.LogInformation("GetFleetHealthLatest — exit, {Count} devices", data.Count);
         return Ok(new ApiListResponse<HealthSnapshotDto> { ReturnCode = 0, Count = data.Count, Data = data });
     }
@@ -71,22 +70,16 @@ public sealed class FleetHealthController : ControllerBase
             return BadRequest(new ApiListResponse<HealthDailyStatsDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<HealthDataRecord> records;
+        IReadOnlyList<HealthDailyStatsDto> data;
         try
         {
-            records = await _healthRepo.GetAllDevicesAndDateAsync(date, ct).ConfigureAwait(false);
+            data = await _healthService.GetDailyStatsAllDevicesAsync(date, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetFleetHealthSummary — DB read failed for date {Date}", date);
             return StatusCode(500, new ApiListResponse<HealthDailyStatsDto> { ReturnCode = 500 });
         }
-
-        var data = records
-            .GroupBy(r => r.DeviceId)
-            .Select(g => ComputeDailyStats(g.Key ?? string.Empty, date, g.ToList()))
-            .OrderBy(s => s.DeviceId)
-            .ToList();
 
         _logger.LogInformation(
             "GetFleetHealthSummary — exit, date: {Date}, devices: {Count}", date, data.Count);
@@ -98,68 +91,4 @@ public sealed class FleetHealthController : ControllerBase
             Data = data
         });
     }
-
-    private static HealthDailyStatsDto ComputeDailyStats(
-        string deviceId,
-        string date,
-        IReadOnlyList<HealthDataRecord> records)
-    {
-        var hrValues    = records.Where(r => r.AvgHeartRate.HasValue).Select(r => r.AvgHeartRate!.Value).ToList();
-        var maxHrVals   = records.Where(r => r.MaxHeartRate.HasValue).Select(r => r.MaxHeartRate!.Value).ToList();
-        var minHrVals   = records.Where(r => r.MinHeartRate.HasValue).Select(r => r.MinHeartRate!.Value).ToList();
-        var spo2Vals    = records.Where(r => r.AvgSpo2.HasValue).Select(r => r.AvgSpo2!.Value).ToList();
-        var sbpVals     = records.Where(r => r.Sbp.HasValue).Select(r => r.Sbp!.Value).ToList();
-        var dbpVals     = records.Where(r => r.Dbp.HasValue).Select(r => r.Dbp!.Value).ToList();
-        var sdnnVals    = records.Where(r => r.HrvSdnn.HasValue).Select(r => r.HrvSdnn!.Value).ToList();
-        var fatigueVals = records.Where(r => r.Fatigue.HasValue).Select(r => r.Fatigue!.Value).ToList();
-        var tempVals    = records.Where(r => r.AxillaryTemp.HasValue).Select(r => r.AxillaryTemp!.Value).ToList();
-
-        return new HealthDailyStatsDto
-        {
-            DeviceId            = deviceId,
-            Date                = date,
-            RecordCount         = records.Count,
-            AvgHeartRate        = hrValues.Count    > 0 ? (long)Math.Round(hrValues.Average())    : null,
-            MaxHeartRate        = maxHrVals.Count   > 0 ? maxHrVals.Max()                          : null,
-            MinHeartRate        = minHrVals.Count   > 0 ? minHrVals.Min()                          : null,
-            AvgSpo2             = spo2Vals.Count    > 0 ? (long)Math.Round(spo2Vals.Average())     : null,
-            MinSpo2             = spo2Vals.Count    > 0 ? spo2Vals.Min()                           : null,
-            TotalSteps          = records.Where(r => r.Steps.HasValue).Sum(r => r.Steps),
-            TotalDistanceMetres = records.Where(r => r.DistanceMetres.HasValue).Sum(r => r.DistanceMetres),
-            TotalCaloriesKcal   = records.Where(r => r.CaloriesKcal.HasValue).Sum(r => r.CaloriesKcal),
-            AvgAxillaryTemp     = tempVals.Count    > 0 ? tempVals.Average()                        : null,
-            AvgSbp              = sbpVals.Count     > 0 ? (long)Math.Round(sbpVals.Average())      : null,
-            AvgDbp              = dbpVals.Count     > 0 ? (long)Math.Round(dbpVals.Average())      : null,
-            AvgHrvSdnn          = sdnnVals.Count    > 0 ? Math.Round(sdnnVals.Average(), 2)        : null,
-            AvgFatigue          = fatigueVals.Count > 0 ? (int)Math.Round(fatigueVals.Average())  : null
-        };
-    }
-
-    private static HealthSnapshotDto MapToSnapshotDto(HealthDataRecord r, TimeZoneInfo? tz) => new()
-    {
-        DeviceId        = r.DeviceId ?? string.Empty,
-        DataTime        = DateTimeUtilities.LocalizeTimestamp(r.DataTime, tz),
-        Steps           = r.Steps,
-        DistanceMetres  = r.DistanceMetres,
-        CaloriesKcal    = r.CaloriesKcal,
-        ActivityType    = r.ActivityType,
-        ActivityState   = r.ActivityState,
-        AvgHeartRate    = r.AvgHeartRate,
-        MaxHeartRate    = r.MaxHeartRate,
-        MinHeartRate    = r.MinHeartRate,
-        AvgSpo2         = r.AvgSpo2,
-        Sbp             = r.Sbp,
-        Dbp             = r.Dbp,
-        HrvSdnn         = r.HrvSdnn,
-        HrvRmssd        = r.HrvRmssd,
-        HrvPnn50        = r.HrvPnn50,
-        HrvMean         = r.HrvMean,
-        Fatigue         = r.Fatigue,
-        AxillaryTemp    = r.AxillaryTemp,
-        EstimatedTemp   = r.EstimatedTemp,
-        BodyFat         = r.BodyFat,
-        Bmi             = r.Bmi,
-        BloodSugar      = r.BloodSugar,
-        BloodPotassium  = r.BloodPotassium
-    };
 }

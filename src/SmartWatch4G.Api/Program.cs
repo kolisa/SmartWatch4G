@@ -1,11 +1,14 @@
 using System.Threading.RateLimiting;
+
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
+
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+
+using Serilog;
+
 using SmartWatch4G.Infrastructure.Extensions;
 using SmartWatch4G.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
-using Serilog;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -54,11 +57,11 @@ try
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new SlidingWindowRateLimiterOptions
                 {
-                    PermitLimit        = 300,
-                    Window             = TimeSpan.FromSeconds(60),
-                    SegmentsPerWindow  = 6,
+                    PermitLimit = 300,
+                    Window = TimeSpan.FromSeconds(60),
+                    SegmentsPerWindow = 6,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    QueueLimit         = 0
+                    QueueLimit = 0
                 }));
 
         options.AddPolicy("device-write", httpContext =>
@@ -66,10 +69,10 @@ try
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit        = 120,
-                    Window             = TimeSpan.FromSeconds(60),
+                    PermitLimit = 120,
+                    Window = TimeSpan.FromSeconds(60),
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    QueueLimit         = 0
+                    QueueLimit = 0
                 }));
     });
 
@@ -90,8 +93,8 @@ try
     {
         options.SwaggerDoc("v1", new OpenApiInfo
         {
-            Title       = "4G Wearable Data API",
-            Version     = "v1",
+            Title = "4G Wearable Data API",
+            Version = "v1",
             Description = "Read-only app/dashboard API for the 4G wearable data platform."
         });
     });

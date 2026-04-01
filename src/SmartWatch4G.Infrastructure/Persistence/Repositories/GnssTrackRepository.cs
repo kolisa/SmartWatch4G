@@ -1,8 +1,9 @@
 using System.Globalization;
+
+using Microsoft.EntityFrameworkCore;
+
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
-using SmartWatch4G.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace SmartWatch4G.Infrastructure.Persistence.Repositories;
 

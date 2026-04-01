@@ -1,4 +1,5 @@
 using SmartWatch4G.Domain.Common;
+
 using Xunit;
 
 namespace SmartWatch4G.UnitTests;

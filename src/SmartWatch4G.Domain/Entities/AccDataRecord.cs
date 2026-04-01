@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>

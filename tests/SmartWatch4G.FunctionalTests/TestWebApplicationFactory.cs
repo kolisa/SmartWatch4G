@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+
 using SmartWatch4G.Domain.Interfaces.Repositories;
 using SmartWatch4G.Domain.Interfaces.Services;
 using SmartWatch4G.FunctionalTests.Stubs;

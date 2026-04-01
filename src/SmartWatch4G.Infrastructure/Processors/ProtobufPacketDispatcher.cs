@@ -1,5 +1,6 @@
-using SmartWatch4G.Domain.Interfaces.Services;
 using Microsoft.Extensions.Logging;
+
+using SmartWatch4G.Domain.Interfaces.Services;
 
 namespace SmartWatch4G.Infrastructure.Processors;
 

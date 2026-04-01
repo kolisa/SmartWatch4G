@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Utilities;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Interfaces.Services;
-using Microsoft.AspNetCore.Mvc;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -86,17 +87,17 @@ public sealed class SleepController : ControllerBase
             ReturnCode = 0,
             Data = new SleepResultDto
             {
-                DeviceId       = r.DeviceId,
-                SleepDate      = r.SleepDate,
-                StartTime      = r.StartTime,
-                EndTime        = r.EndTime,
-                DeepSleep      = r.DeepSleepMinutes,
-                LightSleep     = r.LightSleepMinutes,
-                WeakSleep      = r.WeakSleepMinutes,
-                EyeMoveSleep   = r.EyeMoveSleepMinutes,
-                Score          = r.Score,
-                OsahsRisk      = r.OsahsRisk,
-                Spo2Score      = r.Spo2Score,
+                DeviceId = r.DeviceId,
+                SleepDate = r.SleepDate,
+                StartTime = r.StartTime,
+                EndTime = r.EndTime,
+                DeepSleep = r.DeepSleepMinutes,
+                LightSleep = r.LightSleepMinutes,
+                WeakSleep = r.WeakSleepMinutes,
+                EyeMoveSleep = r.EyeMoveSleepMinutes,
+                Score = r.Score,
+                OsahsRisk = r.OsahsRisk,
+                Spo2Score = r.Spo2Score,
                 SleepHeartRate = r.SleepHeartRate
             }
         });

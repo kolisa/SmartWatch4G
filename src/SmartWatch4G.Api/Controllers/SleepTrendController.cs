@@ -1,10 +1,12 @@
 using Asp.Versioning;
+
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Utilities;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Interfaces.Services;
-using Microsoft.AspNetCore.Mvc;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -83,19 +85,19 @@ public sealed class SleepTrendController : ControllerBase
 
         var data = result.Value!.Select(r => new SleepTrendItemDto
         {
-            DeviceId          = r.DeviceId,
-            SleepDate         = r.SleepDate,
-            StartTime         = DateTimeUtilities.LocalizeTimestamp(r.StartTime, tzInfo),
-            EndTime           = DateTimeUtilities.LocalizeTimestamp(r.EndTime, tzInfo),
+            DeviceId = r.DeviceId,
+            SleepDate = r.SleepDate,
+            StartTime = DateTimeUtilities.LocalizeTimestamp(r.StartTime, tzInfo),
+            EndTime = DateTimeUtilities.LocalizeTimestamp(r.EndTime, tzInfo),
             TotalSleepMinutes = r.DeepSleepMinutes + r.LightSleepMinutes + r.WeakSleepMinutes + r.EyeMoveSleepMinutes,
-            DeepSleep         = r.DeepSleepMinutes,
-            LightSleep        = r.LightSleepMinutes,
-            WeakSleep         = r.WeakSleepMinutes,
-            EyeMoveSleep      = r.EyeMoveSleepMinutes,
-            Score             = r.Score,
-            OsahsRisk         = r.OsahsRisk,
-            Spo2Score         = r.Spo2Score,
-            SleepHeartRate    = r.SleepHeartRate
+            DeepSleep = r.DeepSleepMinutes,
+            LightSleep = r.LightSleepMinutes,
+            WeakSleep = r.WeakSleepMinutes,
+            EyeMoveSleep = r.EyeMoveSleepMinutes,
+            Score = r.Score,
+            OsahsRisk = r.OsahsRisk,
+            Spo2Score = r.Spo2Score,
+            SleepHeartRate = r.SleepHeartRate
         }).ToList();
 
         _logger.LogInformation(

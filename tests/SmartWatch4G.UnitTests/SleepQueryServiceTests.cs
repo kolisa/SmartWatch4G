@@ -1,11 +1,13 @@
-using System;
 using Microsoft.Extensions.Logging.Abstractions;
+
 using Moq;
+
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 using SmartWatch4G.Domain.Interfaces.Services;
 using SmartWatch4G.Infrastructure.Services;
+
 using Xunit;
 
 namespace SmartWatch4G.UnitTests;
@@ -95,9 +97,9 @@ public sealed class SleepQueryServiceTests
         var calcResult = new SleepCalcResult
         {
             StartTime = "2024-01-14 22:00:00",
-            EndTime   = "2024-01-15 06:00:00",
+            EndTime = "2024-01-15 06:00:00",
             HeartRate = 58,
-            Sections  =
+            Sections =
             [
                 new SleepSection { Type = 3, Start = "2024-01-14 22:00:00", End = "2024-01-14 23:00:00" },
                 new SleepSection { Type = 4, Start = "2024-01-14 23:00:00", End = "2024-01-15 06:00:00" }

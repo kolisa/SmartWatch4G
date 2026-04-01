@@ -1,10 +1,10 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -18,14 +18,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetStatusController : ControllerBase
 {
-    private readonly IDeviceStatusRepository _statusRepo;
+    private readonly IDeviceQueryService _deviceService;
     private readonly ILogger<FleetStatusController> _logger;
 
     public FleetStatusController(
-        IDeviceStatusRepository statusRepo,
+        IDeviceQueryService deviceService,
         ILogger<FleetStatusController> logger)
     {
-        _statusRepo = statusRepo;
+        _deviceService = deviceService;
         _logger = logger;
     }
 
@@ -34,26 +34,17 @@ public sealed class FleetStatusController : ControllerBase
     public async Task<IActionResult> GetFleetStatusLatestAsync([FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetFleetStatusLatest — entry");
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
-        IReadOnlyList<DeviceStatusRecord> records;
+        IReadOnlyList<DeviceStatusItemDto> data;
         try
         {
-            records = await _statusRepo.GetLatestAllDevicesAsync(ct).ConfigureAwait(false);
+            data = await _deviceService.GetLatestStatusAllDevicesAsync(tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetFleetStatusLatest — DB read failed");
             return StatusCode(500, new ApiListResponse<DeviceStatusItemDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new DeviceStatusItemDto
-        {
-            DeviceId   = r.DeviceId,
-            EventTime  = DateTimeUtilities.LocalizeTimestamp(r.EventTime, tzInfo),
-            Status     = r.Status,
-            ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tzInfo)
-        }).ToList();
 
         _logger.LogInformation("GetFleetStatusLatest — exit, {Count} devices", data.Count);
         return Ok(new ApiListResponse<DeviceStatusItemDto>

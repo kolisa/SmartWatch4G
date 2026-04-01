@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -19,14 +20,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/call-logs")]
 public sealed class CallLogQueryController : ControllerBase
 {
-    private readonly ICallLogRepository _callLogRepo;
+    private readonly ICallLogQueryService _callLogService;
     private readonly ILogger<CallLogQueryController> _logger;
 
     public CallLogQueryController(
-        ICallLogRepository callLogRepo,
+        ICallLogQueryService callLogService,
         ILogger<CallLogQueryController> logger)
     {
-        _callLogRepo = callLogRepo;
+        _callLogService = callLogService;
         _logger = logger;
     }
 
@@ -46,14 +47,13 @@ public sealed class CallLogQueryController : ControllerBase
         _logger.LogInformation(
             "GetCallLogs — entry, device: {DeviceId}, date: {Date}, from: {From}, to: {To}",
             deviceId, date, from, to);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiListResponse<CallLogItemDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<CallLogRecord> records;
+        IReadOnlyList<CallLogItemDto> data;
         string filterDesc;
 
         try
@@ -68,13 +68,13 @@ public sealed class CallLogQueryController : ControllerBase
                 }
 
                 filterDesc = $"{from} → {to}";
-                records = await _callLogRepo.GetByDeviceAndTimeRangeAsync(deviceId, from, to, ct)
+                data = await _callLogService.GetByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
             else if (DateTimeUtilities.IsValidDate(date))
             {
                 filterDesc = $"date {date}";
-                records = await _callLogRepo.GetByDeviceAndDateAsync(deviceId, date!, ct)
+                data = await _callLogService.GetByDateAsync(deviceId, date!, tz, ct)
                     .ConfigureAwait(false);
             }
             else
@@ -88,20 +88,6 @@ public sealed class CallLogQueryController : ControllerBase
             _logger.LogError(ex, "GetCallLogs — DB read failed for device {DeviceId}", deviceId);
             return StatusCode(500, new ApiListResponse<CallLogItemDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new CallLogItemDto
-        {
-            DeviceId   = r.DeviceId,
-            CallStatus = r.CallStatus,
-            CallNumber = r.CallNumber,
-            StartTime  = DateTimeUtilities.LocalizeTimestamp(r.StartTime, tzInfo),
-            EndTime    = DateTimeUtilities.LocalizeTimestamp(r.EndTime, tzInfo),
-            IsSosAlarm = r.IsSosAlarm,
-            AlarmTime  = DateTimeUtilities.LocalizeTimestamp(r.AlarmTime, tzInfo),
-            AlarmLat   = r.AlarmLat,
-            AlarmLon   = r.AlarmLon,
-            ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tzInfo)
-        }).ToList();
 
         _logger.LogInformation(
             "GetCallLogs — exit, device: {DeviceId}, filter: [{Filter}], count: {Count}",

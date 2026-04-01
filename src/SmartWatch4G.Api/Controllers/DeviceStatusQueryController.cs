@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -20,14 +21,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/status")]
 public sealed class DeviceStatusQueryController : ControllerBase
 {
-    private readonly IDeviceStatusRepository _statusRepo;
+    private readonly IDeviceQueryService _deviceService;
     private readonly ILogger<DeviceStatusQueryController> _logger;
 
     public DeviceStatusQueryController(
-        IDeviceStatusRepository statusRepo,
+        IDeviceQueryService deviceService,
         ILogger<DeviceStatusQueryController> logger)
     {
-        _statusRepo = statusRepo;
+        _deviceService = deviceService;
         _logger = logger;
     }
 
@@ -41,7 +42,6 @@ public sealed class DeviceStatusQueryController : ControllerBase
     {
         _logger.LogInformation(
             "GetDeviceStatus — entry, device: {DeviceId}, date: {Date}", deviceId, date);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
         {
@@ -51,10 +51,10 @@ public sealed class DeviceStatusQueryController : ControllerBase
             return BadRequest(new ApiListResponse<DeviceStatusItemDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<DeviceStatusRecord> records;
+        IReadOnlyList<DeviceStatusItemDto> data;
         try
         {
-            records = await _statusRepo.GetByDeviceAndDateAsync(deviceId, date, ct)
+            data = await _deviceService.GetStatusByDateAsync(deviceId, date, tz, ct)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -64,14 +64,6 @@ public sealed class DeviceStatusQueryController : ControllerBase
                 deviceId, date);
             return StatusCode(500, new ApiListResponse<DeviceStatusItemDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new DeviceStatusItemDto
-        {
-            DeviceId  = r.DeviceId,
-            EventTime = DateTimeUtilities.LocalizeTimestamp(r.EventTime, tzInfo),
-            Status    = r.Status,
-            ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tzInfo)
-        }).ToList();
 
         _logger.LogInformation(
             "GetDeviceStatus — exit, device: {DeviceId}, date: {Date}, count: {Count}",
@@ -90,17 +82,16 @@ public sealed class DeviceStatusQueryController : ControllerBase
     public async Task<IActionResult> GetDeviceStatusLatestAsync(string deviceId, [FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetDeviceStatusLatest — entry, device: {DeviceId}", deviceId);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiItemResponse<DeviceStatusItemDto> { ReturnCode = 400 });
         }
 
-        DeviceStatusRecord? record;
+        DeviceStatusItemDto? item;
         try
         {
-            record = await _statusRepo.GetLatestByDeviceAsync(deviceId, ct).ConfigureAwait(false);
+            item = await _deviceService.GetLatestStatusAsync(deviceId, tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -109,7 +100,7 @@ public sealed class DeviceStatusQueryController : ControllerBase
             return StatusCode(500, new ApiItemResponse<DeviceStatusItemDto> { ReturnCode = 500 });
         }
 
-        if (record is null)
+        if (item is null)
         {
             _logger.LogInformation("GetDeviceStatusLatest — no data for device {DeviceId}", deviceId);
             return NotFound(new ApiItemResponse<DeviceStatusItemDto> { ReturnCode = 404 });
@@ -117,18 +108,12 @@ public sealed class DeviceStatusQueryController : ControllerBase
 
         _logger.LogInformation(
             "GetDeviceStatusLatest — exit, device: {DeviceId}, eventTime: {EventTime}",
-            deviceId, record.EventTime);
+            deviceId, item.EventTime);
 
         return Ok(new ApiItemResponse<DeviceStatusItemDto>
         {
             ReturnCode = 0,
-            Data = new DeviceStatusItemDto
-            {
-                DeviceId  = record.DeviceId,
-                EventTime = DateTimeUtilities.LocalizeTimestamp(record.EventTime, tzInfo),
-                Status    = record.Status,
-                ReceivedAt = DateTimeUtilities.LocalizeDateTime(record.ReceivedAt, tzInfo)
-            }
+            Data = item
         });
     }
 }

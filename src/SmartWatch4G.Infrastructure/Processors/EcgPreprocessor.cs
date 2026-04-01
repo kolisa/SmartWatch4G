@@ -1,8 +1,10 @@
+using Google.Protobuf;
+
+using Microsoft.Extensions.Logging;
+
 using SmartWatch4G.Application.Utilities;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
-using Google.Protobuf;
-using Microsoft.Extensions.Logging;
 
 namespace SmartWatch4G.Infrastructure.Processors;
 

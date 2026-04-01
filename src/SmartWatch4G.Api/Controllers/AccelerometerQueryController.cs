@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -18,14 +19,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/accelerometer")]
 public sealed class AccelerometerQueryController : ControllerBase
 {
-    private readonly IAccDataRepository _accRepo;
+    private readonly IAccelerometerQueryService _accService;
     private readonly ILogger<AccelerometerQueryController> _logger;
 
     public AccelerometerQueryController(
-        IAccDataRepository accRepo,
+        IAccelerometerQueryService accService,
         ILogger<AccelerometerQueryController> logger)
     {
-        _accRepo = accRepo;
+        _accService = accService;
         _logger = logger;
     }
 
@@ -39,7 +40,6 @@ public sealed class AccelerometerQueryController : ControllerBase
     {
         _logger.LogInformation(
             "GetAccelerometer — entry, device: {DeviceId}, date: {Date}", deviceId, date);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
         {
@@ -49,12 +49,10 @@ public sealed class AccelerometerQueryController : ControllerBase
             return BadRequest(new ApiListResponse<AccelerometerReadingDto> { ReturnCode = 400 });
         }
 
-        (string from, string to) = DateTimeUtilities.ToDayRange(date);
-
-        IReadOnlyList<AccDataRecord> records;
+        IReadOnlyList<AccelerometerReadingDto> data;
         try
         {
-            records = await _accRepo.GetByDeviceAndDateRangeAsync(deviceId, from, to, ct)
+            data = await _accService.GetByDateAsync(deviceId, date, tz, ct)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -64,16 +62,6 @@ public sealed class AccelerometerQueryController : ControllerBase
                 deviceId, date);
             return StatusCode(500, new ApiListResponse<AccelerometerReadingDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => new AccelerometerReadingDto
-        {
-            DeviceId = r.DeviceId ?? string.Empty,
-            DataTime = DateTimeUtilities.LocalizeTimestamp(r.DataTime, tzInfo),
-            SampleCount = r.SampleCount,
-            XValuesJson = r.XValuesJson,
-            YValuesJson = r.YValuesJson,
-            ZValuesJson = r.ZValuesJson
-        }).ToList();
 
         _logger.LogInformation(
             "GetAccelerometer — exit, device: {DeviceId}, date: {Date}, count: {Count}",

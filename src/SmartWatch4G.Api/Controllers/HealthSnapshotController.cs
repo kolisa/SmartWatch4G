@@ -1,10 +1,11 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.RateLimiting;
-using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+
+using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -22,14 +23,14 @@ namespace SmartWatch4G.Api.Controllers;
 [Route("api/v{version:apiVersion}/devices/{deviceId}/health")]
 public sealed class HealthSnapshotController : ControllerBase
 {
-    private readonly IHealthDataRepository _healthRepo;
+    private readonly IHealthQueryService _healthService;
     private readonly ILogger<HealthSnapshotController> _logger;
 
     public HealthSnapshotController(
-        IHealthDataRepository healthRepo,
+        IHealthQueryService healthService,
         ILogger<HealthSnapshotController> logger)
     {
-        _healthRepo = healthRepo;
+        _healthService = healthService;
         _logger = logger;
     }
 
@@ -49,14 +50,13 @@ public sealed class HealthSnapshotController : ControllerBase
         _logger.LogInformation(
             "GetHealth — entry, device: {DeviceId}, date: {Date}, from: {From}, to: {To}",
             deviceId, date, from, to);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiListResponse<HealthSnapshotDto> { ReturnCode = 400 });
         }
 
-        IReadOnlyList<HealthDataRecord> records;
+        IReadOnlyList<HealthSnapshotDto> data;
         string filterDesc;
 
         try
@@ -71,13 +71,13 @@ public sealed class HealthSnapshotController : ControllerBase
                 }
 
                 filterDesc = $"{from} → {to}";
-                records = await _healthRepo.GetByDeviceAndTimeRangeAsync(deviceId, from, to, ct)
+                data = await _healthService.GetSnapshotsByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
             else if (DateTimeUtilities.IsValidDate(date))
             {
                 filterDesc = $"date {date}";
-                records = await _healthRepo.GetByDeviceAndDateAsync(deviceId, date!, ct)
+                data = await _healthService.GetSnapshotsByDateAsync(deviceId, date!, tz, ct)
                     .ConfigureAwait(false);
             }
             else
@@ -92,8 +92,6 @@ public sealed class HealthSnapshotController : ControllerBase
             _logger.LogError(ex, "GetHealth — DB read failed for device {DeviceId}", deviceId);
             return StatusCode(500, new ApiListResponse<HealthSnapshotDto> { ReturnCode = 500 });
         }
-
-        var data = records.Select(r => MapToDto(r, tzInfo)).ToList();
 
         _logger.LogInformation(
             "GetHealth — exit, device: {DeviceId}, filter: [{Filter}], count: {Count}",
@@ -112,17 +110,16 @@ public sealed class HealthSnapshotController : ControllerBase
     public async Task<IActionResult> GetHealthLatestAsync(string deviceId, [FromQuery] string? tz, CancellationToken ct)
     {
         _logger.LogInformation("GetHealthLatest — entry, device: {DeviceId}", deviceId);
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
 
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             return BadRequest(new ApiItemResponse<HealthSnapshotDto> { ReturnCode = 400 });
         }
 
-        HealthDataRecord? record;
+        HealthSnapshotDto? item;
         try
         {
-            record = await _healthRepo.GetLatestByDeviceAsync(deviceId, ct).ConfigureAwait(false);
+            item = await _healthService.GetLatestSnapshotAsync(deviceId, tz, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -131,7 +128,7 @@ public sealed class HealthSnapshotController : ControllerBase
             return StatusCode(500, new ApiItemResponse<HealthSnapshotDto> { ReturnCode = 500 });
         }
 
-        if (record is null)
+        if (item is null)
         {
             _logger.LogInformation("GetHealthLatest — no data for device {DeviceId}", deviceId);
             return NotFound(new ApiItemResponse<HealthSnapshotDto> { ReturnCode = 404 });
@@ -139,40 +136,12 @@ public sealed class HealthSnapshotController : ControllerBase
 
         _logger.LogInformation(
             "GetHealthLatest — exit, device: {DeviceId}, dataTime: {DataTime}",
-            deviceId, record.DataTime);
+            deviceId, item.DataTime);
 
         return Ok(new ApiItemResponse<HealthSnapshotDto>
         {
             ReturnCode = 0,
-            Data = MapToDto(record, tzInfo)
+            Data = item
         });
     }
-
-    private static HealthSnapshotDto MapToDto(HealthDataRecord r, TimeZoneInfo? tz) => new()
-    {
-        DeviceId = r.DeviceId ?? string.Empty,
-        DataTime = DateTimeUtilities.LocalizeTimestamp(r.DataTime, tz),
-        Steps = r.Steps,
-        DistanceMetres = r.DistanceMetres,
-        CaloriesKcal = r.CaloriesKcal,
-        ActivityType = r.ActivityType,
-        ActivityState = r.ActivityState,
-        AvgHeartRate = r.AvgHeartRate,
-        MaxHeartRate = r.MaxHeartRate,
-        MinHeartRate = r.MinHeartRate,
-        AvgSpo2 = r.AvgSpo2,
-        Sbp = r.Sbp,
-        Dbp = r.Dbp,
-        HrvSdnn = r.HrvSdnn,
-        HrvRmssd = r.HrvRmssd,
-        HrvPnn50 = r.HrvPnn50,
-        HrvMean = r.HrvMean,
-        Fatigue = r.Fatigue,
-        AxillaryTemp = r.AxillaryTemp,
-        EstimatedTemp = r.EstimatedTemp,
-        BodyFat = r.BodyFat,
-        Bmi = r.Bmi,
-        BloodSugar = r.BloodSugar,
-        BloodPotassium = r.BloodPotassium
-    };
 }
