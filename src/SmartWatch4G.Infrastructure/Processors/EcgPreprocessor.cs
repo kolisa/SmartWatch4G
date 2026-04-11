@@ -16,12 +16,12 @@ namespace SmartWatch4G.Infrastructure.Processors;
 /// </summary>
 public sealed class EcgPreprocessor
 {
-    private readonly IHealthDataRepository _healthRepo;
+    private readonly IEcgDataRepository _ecgRepo;
     private readonly ILogger<EcgPreprocessor> _logger;
 
-    public EcgPreprocessor(IHealthDataRepository healthRepo, ILogger<EcgPreprocessor> logger)
+    public EcgPreprocessor(IEcgDataRepository ecgRepo, ILogger<EcgPreprocessor> logger)
     {
-        _healthRepo = healthRepo;
+        _ecgRepo = ecgRepo;
         _logger = logger;
     }
 
@@ -51,11 +51,17 @@ public sealed class EcgPreprocessor
         var hisEcg = hisNotify.HisData.Ecg;
         string dataTime = DateTimeUtilities.FromUnixSeconds(hisEcg.TimeStamp.DateTime_.Seconds);
 
-        _logger.LogInformation("ECG {Time} — samples: {Count}", dataTime, hisEcg.RawData.Count);
+        _logger.LogDebug("ECG {Time} — samples: {Count}", dataTime, hisEcg.RawData.Count);
 
-        string rawBase64 = Convert.ToBase64String(hisEcg.RawData.Select(v => (byte)v).ToArray());
+        var rawBytes = new byte[hisEcg.RawData.Count];
+        for (int i = 0; i < hisEcg.RawData.Count; i++)
+        {
+            rawBytes[i] = (byte)hisEcg.RawData[i];
+        }
 
-        await _healthRepo.AddEcgAsync(new EcgDataRecord
+        string rawBase64 = Convert.ToBase64String(rawBytes);
+
+        await _ecgRepo.AddAsync(new EcgDataRecord
         {
             DeviceId = deviceId,
             DataTime = dataTime,

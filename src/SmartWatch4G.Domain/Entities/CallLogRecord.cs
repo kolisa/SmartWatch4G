@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -7,7 +9,13 @@ namespace SmartWatch4G.Domain.Entities;
 public sealed class CallLogRecord
 {
     public int Id { get; set; }
-    public string DeviceId { get; set; } = string.Empty;
+
+    private string _deviceId = string.Empty;
+    public string DeviceId
+    {
+        get => _deviceId;
+        set => _deviceId = Guard.NotNullOrWhiteSpace(value, nameof(DeviceId));
+    }
 
     // -- call fields --
     public int CallStatus { get; set; }

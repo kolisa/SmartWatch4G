@@ -16,7 +16,7 @@ namespace SmartWatch4G.Api.Controllers;
 ///   DELETE /api/v1/devices/{deviceId}/phonebook — clear all phonebook entries
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/phonebook")]
 public sealed class PhonebookCommandController : ControllerBase

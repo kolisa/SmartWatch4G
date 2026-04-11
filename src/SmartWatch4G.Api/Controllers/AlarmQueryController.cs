@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -16,20 +15,23 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/devices/{deviceId}/alarms/latest   — most recent alarm event
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/alarms")]
 public sealed class AlarmQueryController : ControllerBase
 {
     private readonly IAlarmQueryService _alarmService;
     private readonly ILogger<AlarmQueryController> _logger;
+    private readonly IDateTimeService _dt;
 
     public AlarmQueryController(
         IAlarmQueryService alarmService,
-        ILogger<AlarmQueryController> logger)
+        ILogger<AlarmQueryController> logger,
+        IDateTimeService dt)
     {
         _alarmService = alarmService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>
@@ -61,7 +63,7 @@ public sealed class AlarmQueryController : ControllerBase
         {
             if (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
             {
-                if (!DateTimeUtilities.IsValidDateTime(from) || !DateTimeUtilities.IsValidDateTime(to))
+                if (!_dt.IsValidDateTime(from) || !_dt.IsValidDateTime(to))
                 {
                     _logger.LogWarning(
                         "GetAlarms — invalid datetime range, from: {From}, to: {To}", from, to);
@@ -72,7 +74,7 @@ public sealed class AlarmQueryController : ControllerBase
                 data = await _alarmService.GetByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
-            else if (DateTimeUtilities.IsValidDate(date))
+            else if (_dt.IsValidDate(date))
             {
                 filterDesc = $"date {date}";
                 data = await _alarmService.GetByDateAsync(deviceId, date!, tz, ct)

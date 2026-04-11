@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
 
+using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Application.Utilities;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
@@ -17,15 +19,25 @@ public sealed class SleepQueryServiceTests
     private readonly Mock<ISleepDataRepository> _sleepRepo = new();
     private readonly Mock<IRriDataRepository> _rriRepo = new();
     private readonly Mock<IWownAlgoClient> _algoClient = new();
+    private readonly Mock<IDateTimeService> _dt = new();
     private readonly SleepQueryService _sut;
 
     public SleepQueryServiceTests()
     {
+        // Wire the mock to delegate to the real static helpers so test logic is unchanged
+        _dt.Setup(d => d.IsValidDate(It.IsAny<string?>()))
+            .Returns<string?>(DateTimeUtilities.IsValidDate);
+        _dt.Setup(d => d.GetPreviousDay(It.IsAny<string>()))
+            .Returns<string>(DateTimeUtilities.GetPreviousDay);
+        _dt.Setup(d => d.TryParseDate(It.IsAny<string?>()))
+            .Returns<string?>(DateTimeUtilities.TryParseDate);
+
         _sut = new SleepQueryService(
             _sleepRepo.Object,
             _rriRepo.Object,
             _algoClient.Object,
-            NullLogger<SleepQueryService>.Instance);
+            NullLogger<SleepQueryService>.Instance,
+            _dt.Object);
     }
 
     // ── GetSleepResultAsync ────────────────────────────────────────────────

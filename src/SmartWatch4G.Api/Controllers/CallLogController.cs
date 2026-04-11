@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 
@@ -19,13 +20,16 @@ namespace SmartWatch4G.Api.Controllers;
 public sealed class CallLogController : ControllerBase
 {
     private readonly ICallLogRepository _callLogRepo;
+    private readonly IUnitOfWork _uow;
     private readonly ILogger<CallLogController> _logger;
 
     public CallLogController(
         ICallLogRepository callLogRepo,
+        IUnitOfWork uow,
         ILogger<CallLogController> logger)
     {
         _callLogRepo = callLogRepo;
+        _uow = uow;
         _logger = logger;
     }
 
@@ -40,7 +44,7 @@ public sealed class CallLogController : ControllerBase
         {
             using var reader = new StreamReader(Request.Body);
             string body = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
-            _logger.LogInformation("UploadCallLog payload: {Body}", body);
+            _logger.LogDebug("UploadCallLog payload: {Body}", body);
 
             dto = JsonSerializer.Deserialize<DeviceCallLogsDto>(body);
             if (dto is null)
@@ -68,6 +72,7 @@ public sealed class CallLogController : ControllerBase
             try
             {
                 await _callLogRepo.AddRangeAsync(records, ct).ConfigureAwait(false);
+                await _uow.CommitAsync(ct).ConfigureAwait(false);
                 _logger.LogInformation(
                     "UploadCallLog — saved {Count} records for device {DeviceId}",
                     records.Count, dto.DeviceId);

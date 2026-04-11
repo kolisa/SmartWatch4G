@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -11,16 +13,32 @@ public sealed class SleepDataRecord
     public string? DeviceId { get; set; }
 
     /// <summary>Date component of the measurement, e.g. "2024-03-15".</summary>
-    public string SleepDate { get; set; } = string.Empty;
+    private string _sleepDate = string.Empty;
+    public string SleepDate
+    {
+        get => _sleepDate;
+        set => _sleepDate = Guard.NotNullOrWhiteSpace(value, nameof(SleepDate));
+    }
 
-    public string DataTime { get; set; } = string.Empty;
+    private string _dataTime = string.Empty;
+    public string DataTime
+    {
+        get => _dataTime;
+        set => _dataTime = Guard.NotNullOrWhiteSpace(value, nameof(DataTime));
+    }
+
     public long Seq { get; set; }
 
     /// <summary>
     /// Compact JSON string representing one five-minute health slot used as
     /// input for sleep-stage calculation (e.g. {"Q":42,"T":[23,15],"E":{...}}).
     /// </summary>
-    public string SleepJson { get; set; } = string.Empty;
+    private string _sleepJson = string.Empty;
+    public string SleepJson
+    {
+        get => _sleepJson;
+        set => _sleepJson = Guard.NotNullOrWhiteSpace(value, nameof(SleepJson));
+    }
 
     public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
 }

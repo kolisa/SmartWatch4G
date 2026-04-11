@@ -16,7 +16,7 @@ namespace SmartWatch4G.Api.Controllers;
 /// Days with no sleep data are omitted from the response.
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/sleep/trend")]
 public sealed class SleepTrendController : ControllerBase

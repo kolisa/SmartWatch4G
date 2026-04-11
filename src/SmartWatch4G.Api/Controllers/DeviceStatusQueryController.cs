@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -16,20 +15,23 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/devices/{deviceId}/status/latest   — most recent status event
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/status")]
 public sealed class DeviceStatusQueryController : ControllerBase
 {
     private readonly IDeviceQueryService _deviceService;
     private readonly ILogger<DeviceStatusQueryController> _logger;
+    private readonly IDateTimeService _dt;
 
     public DeviceStatusQueryController(
         IDeviceQueryService deviceService,
-        ILogger<DeviceStatusQueryController> logger)
+        ILogger<DeviceStatusQueryController> logger,
+        IDateTimeService dt)
     {
         _deviceService = deviceService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>Returns device status events received on the given date (yyyy-MM-dd).</summary>
@@ -43,7 +45,7 @@ public sealed class DeviceStatusQueryController : ControllerBase
         _logger.LogInformation(
             "GetDeviceStatus — entry, device: {DeviceId}, date: {Date}", deviceId, date);
 
-        if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
+        if (string.IsNullOrWhiteSpace(deviceId) || !_dt.IsValidDate(date))
         {
             _logger.LogWarning(
                 "GetDeviceStatus — invalid parameters, device: {DeviceId}, date: {Date}",

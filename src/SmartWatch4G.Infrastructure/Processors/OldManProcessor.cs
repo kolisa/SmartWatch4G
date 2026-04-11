@@ -47,7 +47,7 @@ public sealed class OldManProcessor
             ? -(int)(~rssiRaw + 1)
             : (int)rssiRaw;
 
-        _logger.LogInformation("{Time} — battery: {B}%, RSSI: {R} dBm", rtTimeStr, battery, rssi);
+        _logger.LogDebug("{Time} — battery: {B}%, RSSI: {R} dBm", rtTimeStr, battery, rssi);
 
         long? steps = null;
         float? dist = null;
@@ -58,7 +58,7 @@ public sealed class OldManProcessor
             steps = omInfo.Health.Steps;
             dist = omInfo.Health.Distance * 0.1f;
             cal = omInfo.Health.Calorie * 0.1f;
-            _logger.LogInformation("{Time} — steps: {S}, dist: {D:F1} m, cal: {C:F1} kcal",
+            _logger.LogDebug("{Time} — steps: {S}, dist: {D:F1} m, cal: {C:F1} kcal",
                 rtTimeStr, steps, dist, cal);
         }
 
@@ -72,7 +72,7 @@ public sealed class OldManProcessor
         foreach (var track in omInfo.TrackData)
         {
             string gnssTime = DateTimeUtilities.FromUnixSeconds(track.Time.DateTime_.Seconds);
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "GNSS {Time} — lon: {Lon}, lat: {Lat}, type: {Type}",
                 gnssTime, track.Gnss.Longitude, track.Gnss.Latitude, track.GpsType);
 

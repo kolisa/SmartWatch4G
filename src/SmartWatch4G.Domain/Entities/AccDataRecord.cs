@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -11,16 +13,36 @@ public sealed class AccDataRecord
     public string? DeviceId { get; set; }
 
     /// <summary>Timestamp of this one-minute slot, e.g. "2024-03-15 14:01:00".</summary>
-    public string DataTime { get; set; } = string.Empty;
+    private string _dataTime = string.Empty;
+    public string DataTime
+    {
+        get => _dataTime;
+        set => _dataTime = Guard.NotNullOrWhiteSpace(value, nameof(DataTime));
+    }
 
     /// <summary>X-axis samples serialised as a JSON int array.</summary>
-    public string XValuesJson { get; set; } = string.Empty;
+    private string _xValuesJson = string.Empty;
+    public string XValuesJson
+    {
+        get => _xValuesJson;
+        set => _xValuesJson = Guard.NotNullOrWhiteSpace(value, nameof(XValuesJson));
+    }
 
     /// <summary>Y-axis samples serialised as a JSON int array.</summary>
-    public string YValuesJson { get; set; } = string.Empty;
+    private string _yValuesJson = string.Empty;
+    public string YValuesJson
+    {
+        get => _yValuesJson;
+        set => _yValuesJson = Guard.NotNullOrWhiteSpace(value, nameof(YValuesJson));
+    }
 
     /// <summary>Z-axis samples serialised as a JSON int array.</summary>
-    public string ZValuesJson { get; set; } = string.Empty;
+    private string _zValuesJson = string.Empty;
+    public string ZValuesJson
+    {
+        get => _zValuesJson;
+        set => _zValuesJson = Guard.NotNullOrWhiteSpace(value, nameof(ZValuesJson));
+    }
 
     public int SampleCount { get; set; }
 

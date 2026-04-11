@@ -19,7 +19,7 @@ namespace SmartWatch4G.Api.Controllers;
 ///   DELETE /api/v1/devices/{deviceId}/sedentary     — clear all sedentary reminders
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}")]
 public sealed class ScheduleCommandController : ControllerBase

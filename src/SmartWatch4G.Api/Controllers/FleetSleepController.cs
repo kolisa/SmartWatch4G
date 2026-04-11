@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
-using SmartWatch4G.Application.Utilities;
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
@@ -18,7 +18,7 @@ namespace SmartWatch4G.Api.Controllers;
 /// Returns computed sleep results for every device that has data on the given date.
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetSleepController : ControllerBase
@@ -26,15 +26,18 @@ public sealed class FleetSleepController : ControllerBase
     private readonly IDeviceInfoRepository _deviceInfoRepo;
     private readonly ISleepQueryService _sleepService;
     private readonly ILogger<FleetSleepController> _logger;
+    private readonly IDateTimeService _dt;
 
     public FleetSleepController(
         IDeviceInfoRepository deviceInfoRepo,
         ISleepQueryService sleepService,
-        ILogger<FleetSleepController> logger)
+        ILogger<FleetSleepController> logger,
+        IDateTimeService dt)
     {
         _deviceInfoRepo = deviceInfoRepo;
         _sleepService = sleepService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>
@@ -49,13 +52,13 @@ public sealed class FleetSleepController : ControllerBase
     {
         _logger.LogInformation("GetFleetSleep — entry, date: {Date}", date);
 
-        if (!DateTimeUtilities.IsValidDate(date))
+        if (!_dt.IsValidDate(date))
         {
             _logger.LogWarning("GetFleetSleep — invalid date: {Date}", date);
             return BadRequest(new ApiListResponse<SleepResultDto> { ReturnCode = 400 });
         }
 
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
 
         IReadOnlyList<DeviceInfoRecord> devices;
         try
@@ -84,8 +87,8 @@ public sealed class FleetSleepController : ControllerBase
                     {
                         DeviceId = r.DeviceId,
                         SleepDate = r.SleepDate,
-                        StartTime = DateTimeUtilities.LocalizeTimestamp(r.StartTime, tzInfo),
-                        EndTime = DateTimeUtilities.LocalizeTimestamp(r.EndTime, tzInfo),
+                        StartTime = _dt.LocalizeTimestamp(r.StartTime, tzInfo),
+                        EndTime = _dt.LocalizeTimestamp(r.EndTime, tzInfo),
                         DeepSleep = r.DeepSleepMinutes,
                         LightSleep = r.LightSleepMinutes,
                         WeakSleep = r.WeakSleepMinutes,

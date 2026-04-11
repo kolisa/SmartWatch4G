@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Entities;
 
 namespace SmartWatch4G.Infrastructure.Persistence;
@@ -7,10 +8,16 @@ namespace SmartWatch4G.Infrastructure.Persistence;
 /// <summary>
 /// Entity Framework Core database context for the 4G wearable data platform.
 /// Replaces the original file-based logging with a proper relational store.
+/// Implements <see cref="IUnitOfWork"/> so processors can commit all tracked
+/// changes in a single network round-trip after building their entity graph.
 /// </summary>
-public sealed class AppDbContext : DbContext
+public sealed class AppDbContext : DbContext, IUnitOfWork
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+    /// <inheritdoc />
+    public Task CommitAsync(CancellationToken cancellationToken = default)
+        => SaveChangesAsync(cancellationToken);
 
     public DbSet<DeviceInfoRecord> DeviceInfoRecords => Set<DeviceInfoRecord>();
     public DbSet<DeviceStatusRecord> DeviceStatusRecords => Set<DeviceStatusRecord>();
@@ -23,6 +30,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<GnssTrackRecord> GnssTrackRecords => Set<GnssTrackRecord>();
     public DbSet<Spo2DataRecord> Spo2DataRecords => Set<Spo2DataRecord>();
     public DbSet<AccDataRecord> AccDataRecords => Set<AccDataRecord>();
+    public DbSet<PpgDataRecord> PpgDataRecords => Set<PpgDataRecord>();
+    public DbSet<MultiLeadsEcgRecord> MultiLeadsEcgRecords => Set<MultiLeadsEcgRecord>();
+    public DbSet<YylpfeRecord> YylpfeRecords => Set<YylpfeRecord>();
+    public DbSet<ThirdPartyDataRecord> ThirdPartyDataRecords => Set<ThirdPartyDataRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -112,6 +123,39 @@ public sealed class AppDbContext : DbContext
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.DeviceId, x.DataTime });
             e.Property(x => x.DeviceId).HasMaxLength(64);
+            e.Property(x => x.DataTime).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<PpgDataRecord>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.DeviceId, x.DataTime });
+            e.Property(x => x.DeviceId).HasMaxLength(64);
+            e.Property(x => x.DataTime).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<MultiLeadsEcgRecord>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.DeviceId, x.DataTime });
+            e.Property(x => x.DeviceId).HasMaxLength(64);
+            e.Property(x => x.DataTime).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<YylpfeRecord>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.DeviceId, x.DataTime });
+            e.Property(x => x.DeviceId).HasMaxLength(64);
+            e.Property(x => x.DataTime).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<ThirdPartyDataRecord>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.DeviceId, x.DataTime });
+            e.Property(x => x.DeviceId).HasMaxLength(64);
+            e.Property(x => x.MacAddr).HasMaxLength(32);
             e.Property(x => x.DataTime).HasMaxLength(32);
         });
 

@@ -1,5 +1,7 @@
 using System.Globalization;
 
+using Dapper;
+
 using Microsoft.EntityFrameworkCore;
 
 using SmartWatch4G.Domain.Entities;
@@ -13,10 +15,10 @@ internal sealed class GnssTrackRepository : IGnssTrackRepository
 
     public GnssTrackRepository(AppDbContext db) => _db = db;
 
-    public async Task AddRangeAsync(IEnumerable<GnssTrackRecord> records, CancellationToken cancellationToken = default)
+    public Task AddRangeAsync(IEnumerable<GnssTrackRecord> records, CancellationToken cancellationToken = default)
     {
         _db.GnssTrackRecords.AddRange(records);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<GnssTrackRecord>> GetByDeviceAndDateAsync(
@@ -85,20 +87,17 @@ internal sealed class GnssTrackRepository : IGnssTrackRepository
     public async Task<IReadOnlyList<GnssTrackRecord>> GetLatestAllDevicesAsync(
         CancellationToken cancellationToken = default)
     {
-        // Subquery: max TrackTime per device, then join to get the full record
-        var latestPerDevice = _db.GnssTrackRecords
-            .GroupBy(r => r.DeviceId)
-            .Select(g => new { DeviceId = g.Key, MaxTrackTime = g.Max(r => r.TrackTime)! });
-
-        return await _db.GnssTrackRecords
-            .AsNoTracking()
-            .Join(latestPerDevice,
-                  r => new { r.DeviceId, r.TrackTime },
-                  l => new { l.DeviceId, TrackTime = l.MaxTrackTime },
-                  (r, _) => r)
-            .OrderBy(r => r.DeviceId)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        using var conn = new Microsoft.Data.SqlClient.SqlConnection(
+            _db.Database.GetConnectionString());
+        return (await conn.QueryAsync<GnssTrackRecord>("""
+            SELECT *
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY DeviceId ORDER BY TrackTime DESC) AS _rn
+                FROM   GnssTrackRecords
+            ) t
+            WHERE t._rn = 1
+            ORDER BY DeviceId
+            """)).AsList();
     }
 
     public async Task<IReadOnlyList<GnssTrackRecord>> GetAllDevicesAndDateAsync(

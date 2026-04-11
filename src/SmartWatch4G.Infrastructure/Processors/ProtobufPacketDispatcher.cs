@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Interfaces.Services;
 
 namespace SmartWatch4G.Infrastructure.Processors;
@@ -8,6 +9,8 @@ namespace SmartWatch4G.Infrastructure.Processors;
 /// Routes decoded binary packets to the correct processor based on opcode.
 /// Implements <see cref="IProtobufPacketHandler"/> so the API layer depends only
 /// on the domain abstraction, not the concrete processors.
+/// All processors <em>track</em> changes; a single <see cref="IUnitOfWork.CommitAsync"/>
+/// call here flushes everything in one SQL round-trip per incoming packet.
 /// </summary>
 public sealed class ProtobufPacketDispatcher : IProtobufPacketHandler
 {
@@ -22,6 +25,7 @@ public sealed class ProtobufPacketDispatcher : IProtobufPacketHandler
     private readonly AfPreprocessor _afPreprocessor;
     private readonly EcgPreprocessor _ecgPreprocessor;
     private readonly SleepPreprocessor _sleepPreprocessor;
+    private readonly IUnitOfWork _uow;
     private readonly ILogger<ProtobufPacketDispatcher> _logger;
 
     public ProtobufPacketDispatcher(
@@ -31,6 +35,7 @@ public sealed class ProtobufPacketDispatcher : IProtobufPacketHandler
         AfPreprocessor afPreprocessor,
         EcgPreprocessor ecgPreprocessor,
         SleepPreprocessor sleepPreprocessor,
+        IUnitOfWork uow,
         ILogger<ProtobufPacketDispatcher> logger)
     {
         _historyProcessor = historyProcessor;
@@ -39,6 +44,7 @@ public sealed class ProtobufPacketDispatcher : IProtobufPacketHandler
         _afPreprocessor = afPreprocessor;
         _ecgPreprocessor = ecgPreprocessor;
         _sleepPreprocessor = sleepPreprocessor;
+        _uow = uow;
         _logger = logger;
     }
 
@@ -55,10 +61,12 @@ public sealed class ProtobufPacketDispatcher : IProtobufPacketHandler
                 await _oldManProcessor
                     .ProcessAsync(deviceId, payload, cancellationToken)
                     .ConfigureAwait(false);
+                await _uow.CommitAsync(cancellationToken).ConfigureAwait(false);
                 break;
 
             case OpcodeHistoryData:
-                // Run all 0x80 processors; each filters internally for its data type
+                // Run all 0x80 processors; each filters internally for its data type,
+                // then commit all tracked entities in a single round-trip.
                 await _historyProcessor
                     .ProcessAsync(deviceId, payload, cancellationToken)
                     .ConfigureAwait(false);
@@ -71,12 +79,14 @@ public sealed class ProtobufPacketDispatcher : IProtobufPacketHandler
                 await _afPreprocessor
                     .PrepareRriDataAsync(deviceId, payload, cancellationToken)
                     .ConfigureAwait(false);
+                await _uow.CommitAsync(cancellationToken).ConfigureAwait(false);
                 break;
 
             case OpcodeAlarmV2:
                 await _alarmProcessor
                     .ProcessAsync(deviceId, payload, cancellationToken)
                     .ConfigureAwait(false);
+                await _uow.CommitAsync(cancellationToken).ConfigureAwait(false);
                 break;
 
             default:

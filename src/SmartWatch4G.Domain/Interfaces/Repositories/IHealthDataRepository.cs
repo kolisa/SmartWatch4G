@@ -5,9 +5,7 @@ namespace SmartWatch4G.Domain.Interfaces.Repositories;
 public interface IHealthDataRepository
 {
     Task AddAsync(HealthDataRecord record, CancellationToken cancellationToken = default);
-    Task AddEcgAsync(EcgDataRecord record, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<HealthDataRecord>> GetByDeviceAndDateAsync(string deviceId, string date, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<EcgDataRecord>> GetEcgByDeviceAndDateAsync(string deviceId, string date, CancellationToken cancellationToken = default);
 
     /// <summary>Returns health snapshots within an explicit datetime range (yyyy-MM-dd HH:mm:ss).</summary>
     Task<IReadOnlyList<HealthDataRecord>> GetByDeviceAndTimeRangeAsync(string deviceId, string fromTime, string toTime, CancellationToken cancellationToken = default);

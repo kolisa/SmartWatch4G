@@ -11,10 +11,10 @@ internal sealed class Spo2DataRepository : ISpo2DataRepository
 
     public Spo2DataRepository(AppDbContext db) => _db = db;
 
-    public async Task AddRangeAsync(IEnumerable<Spo2DataRecord> records, CancellationToken cancellationToken = default)
+    public Task AddRangeAsync(IEnumerable<Spo2DataRecord> records, CancellationToken cancellationToken = default)
     {
         _db.Spo2DataRecords.AddRange(records);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<Spo2DataRecord>> GetByDeviceAndDateRangeAsync(

@@ -18,7 +18,7 @@ namespace SmartWatch4G.Api.Controllers;
 /// (see <see cref="SleepController"/>).
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/sleep")]
 public sealed class SleepAnalysisController : ControllerBase

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 
@@ -19,13 +20,16 @@ namespace SmartWatch4G.Api.Controllers;
 public sealed class DeviceStatusController : ControllerBase
 {
     private readonly IDeviceStatusRepository _statusRepo;
+    private readonly IUnitOfWork _uow;
     private readonly ILogger<DeviceStatusController> _logger;
 
     public DeviceStatusController(
         IDeviceStatusRepository statusRepo,
+        IUnitOfWork uow,
         ILogger<DeviceStatusController> logger)
     {
         _statusRepo = statusRepo;
+        _uow = uow;
         _logger = logger;
     }
 
@@ -40,7 +44,7 @@ public sealed class DeviceStatusController : ControllerBase
         {
             using var reader = new StreamReader(Request.Body);
             string body = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
-            _logger.LogInformation("NotifyDeviceStatus payload: {Body}", body);
+            _logger.LogDebug("NotifyDeviceStatus payload: {Body}", body);
 
             dto = JsonSerializer.Deserialize<DeviceStatusDto>(body);
             if (dto is null)
@@ -77,6 +81,7 @@ public sealed class DeviceStatusController : ControllerBase
                 EventTime = dto.EventTime,
                 Status = dto.Status
             }, ct).ConfigureAwait(false);
+            await _uow.CommitAsync(ct).ConfigureAwait(false);
 
             _logger.LogInformation(
                 "NotifyDeviceStatus — exit, saved status for device {DeviceId}", dto.DeviceId);

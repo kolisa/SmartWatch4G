@@ -1,3 +1,5 @@
+using Dapper;
+
 using Microsoft.EntityFrameworkCore;
 
 using SmartWatch4G.Domain.Entities;
@@ -43,7 +45,7 @@ internal sealed class DeviceInfoRepository : IDeviceInfoRepository
             existing.UpdatedAt = System.DateTime.UtcNow;
         }
 
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        // Caller must commit via IUnitOfWork.CommitAsync
     }
 
     public Task<DeviceInfoRecord?> FindByDeviceIdAsync(string deviceId, CancellationToken cancellationToken = default)
@@ -52,9 +54,12 @@ internal sealed class DeviceInfoRepository : IDeviceInfoRepository
                .FirstOrDefaultAsync(x => x.DeviceId == deviceId, cancellationToken);
 
     public async Task<IReadOnlyList<DeviceInfoRecord>> GetAllAsync(CancellationToken cancellationToken = default)
-        => await _db.DeviceInfoRecords
-                    .AsNoTracking()
-                    .OrderBy(x => x.DeviceId)
-                    .ToListAsync(cancellationToken)
-                    .ConfigureAwait(false);
+    {
+        // Dapper bypasses the EF change tracker — ~2× faster for large read-only
+        // result sets. At 100 000+ devices the change-tracker overhead adds up.
+        using var conn = new Microsoft.Data.SqlClient.SqlConnection(
+            _db.Database.GetConnectionString());
+        return (await conn.QueryAsync<DeviceInfoRecord>(
+            "SELECT * FROM DeviceInfoRecords ORDER BY DeviceId")).AsList();
+    }
 }

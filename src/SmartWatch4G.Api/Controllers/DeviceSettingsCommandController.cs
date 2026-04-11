@@ -29,7 +29,7 @@ namespace SmartWatch4G.Api.Controllers;
 ///   PUT  bp-schedule              — blood-pressure measurement schedule
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/settings")]
 public sealed class DeviceSettingsCommandController : ControllerBase

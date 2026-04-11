@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -9,7 +11,14 @@ public sealed class EcgDataRecord
 {
     public int Id { get; set; }
     public string? DeviceId { get; set; }
-    public string DataTime { get; set; } = string.Empty;
+
+    private string _dataTime = string.Empty;
+    public string DataTime
+    {
+        get => _dataTime;
+        set => _dataTime = Guard.NotNullOrWhiteSpace(value, nameof(DataTime));
+    }
+
     public long Seq { get; set; }
     public int SampleCount { get; set; }
 
@@ -17,7 +26,12 @@ public sealed class EcgDataRecord
     /// Raw ECG samples serialised as a base64 string for compact storage.
     /// Decode to int[] before analysis.
     /// </summary>
-    public string RawDataBase64 { get; set; } = string.Empty;
+    private string _rawDataBase64 = string.Empty;
+    public string RawDataBase64
+    {
+        get => _rawDataBase64;
+        set => _rawDataBase64 = Guard.NotNullOrWhiteSpace(value, nameof(RawDataBase64));
+    }
 
     public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
 }

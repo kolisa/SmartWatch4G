@@ -13,7 +13,7 @@ namespace SmartWatch4G.Api.Controllers;
 /// Route: GET /api/fleet/status/latest
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetStatusController : ControllerBase

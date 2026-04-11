@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -16,20 +15,23 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/devices/{deviceId}/spo2/latest   — most recent reading
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/spo2")]
 public sealed class Spo2QueryController : ControllerBase
 {
     private readonly ISpo2QueryService _spo2Service;
     private readonly ILogger<Spo2QueryController> _logger;
+    private readonly IDateTimeService _dt;
 
     public Spo2QueryController(
         ISpo2QueryService spo2Service,
-        ILogger<Spo2QueryController> logger)
+        ILogger<Spo2QueryController> logger,
+        IDateTimeService dt)
     {
         _spo2Service = spo2Service;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>
@@ -61,7 +63,7 @@ public sealed class Spo2QueryController : ControllerBase
         {
             if (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
             {
-                if (!DateTimeUtilities.IsValidDateTime(from) || !DateTimeUtilities.IsValidDateTime(to))
+                if (!_dt.IsValidDateTime(from) || !_dt.IsValidDateTime(to))
                 {
                     _logger.LogWarning(
                         "GetSpo2 — invalid datetime range, from: {From}, to: {To}", from, to);
@@ -72,7 +74,7 @@ public sealed class Spo2QueryController : ControllerBase
                 data = await _spo2Service.GetByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
-            else if (DateTimeUtilities.IsValidDate(date))
+            else if (_dt.IsValidDate(date))
             {
                 filterDesc = $"date {date}";
                 data = await _spo2Service.GetByDateAsync(deviceId, date!, tz, ct)

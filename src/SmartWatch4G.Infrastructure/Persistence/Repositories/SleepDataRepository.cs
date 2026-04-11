@@ -11,10 +11,10 @@ internal sealed class SleepDataRepository : ISleepDataRepository
 
     public SleepDataRepository(AppDbContext db) => _db = db;
 
-    public async Task AddAsync(SleepDataRecord record, CancellationToken cancellationToken = default)
+    public Task AddAsync(SleepDataRecord record, CancellationToken cancellationToken = default)
     {
         _db.SleepDataRecords.Add(record);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<SleepDataRecord>> GetByDeviceAndDateAsync(

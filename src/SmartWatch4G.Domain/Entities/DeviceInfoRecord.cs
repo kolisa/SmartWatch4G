@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -6,7 +8,14 @@ namespace SmartWatch4G.Domain.Entities;
 public sealed class DeviceInfoRecord
 {
     public int Id { get; set; }
-    public string DeviceId { get; set; } = string.Empty;
+
+    private string _deviceId = string.Empty;
+    public string DeviceId
+    {
+        get => _deviceId;
+        set => _deviceId = Guard.NotNullOrWhiteSpace(value, nameof(DeviceId));
+    }
+
     public string Imsi { get; set; } = string.Empty;
     public string Sn { get; set; } = string.Empty;
     public string Mac { get; set; } = string.Empty;

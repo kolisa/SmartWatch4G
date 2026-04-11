@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace SmartWatch4G.Application.DTOs;
 
 // ── Generic command response ──────────────────────────────────────────────────
@@ -24,16 +26,22 @@ public sealed class DeviceOnlineStatusDto
 /// <summary>Push user profile to a device.</summary>
 public sealed class SendUserInfoRequest
 {
-    /// <summary>Height in cm.</summary>
+    /// <summary>Height in cm (50–250).</summary>
+    [Range(50, 250)]
     public int Height { get; set; }
-    /// <summary>Weight in kg.</summary>
+    /// <summary>Weight in kg (20–300).</summary>
+    [Range(20, 300)]
     public int Weight { get; set; }
     /// <summary>1 = male, 2 = female.</summary>
+    [Range(1, 2)]
     public int Gender { get; set; }
+    [Range(0, 120)]
     public int Age { get; set; }
     /// <summary>Wrist circumference in mm (80–230).</summary>
+    [Range(80, 230)]
     public int WristCircle { get; set; }
     /// <summary>1 = hypertensive, 2 = not hypertensive.</summary>
+    [Range(1, 2)]
     public int Hypertension { get; set; }
 }
 
@@ -41,8 +49,12 @@ public sealed class SendUserInfoRequest
 public sealed class SendMessageRequest
 {
     /// <summary>Title — max 15 bytes.</summary>
+    [Required]
+    [StringLength(15)]
     public string Title { get; set; } = string.Empty;
     /// <summary>Body — max 240 bytes.</summary>
+    [Required]
+    [StringLength(240)]
     public string Description { get; set; } = string.Empty;
 }
 
@@ -56,14 +68,18 @@ public sealed class SetLanguageRequest
     /// 17=Danish, 18=Ukrainian, 19=Norwegian, 20=Dutch, 21=Czech,
     /// 22=Chinese(Traditional), 23=Indonesian.
     /// </summary>
+    [Range(0, 23)]
     public int LanguageCode { get; set; }
 }
 
 /// <summary>Set daily activity goals.</summary>
 public sealed class SetGoalRequest
 {
+    [Range(0, 100_000)]
     public int Step { get; set; }
+    [Range(0, 100_000)]
     public int DistanceMetres { get; set; }
+    [Range(0, 10_000)]
     public int CalorieKcal { get; set; }
 }
 
@@ -73,10 +89,14 @@ public sealed class SetGoalRequest
 public sealed class SetHrAlarmRequest
 {
     public bool Open { get; set; }
+    [Range(40, 220)]
     public int High { get; set; }
+    [Range(40, 220)]
     public int Low { get; set; }
     /// <summary>Number of consecutive abnormal readings before alert fires.</summary>
+    [Range(1, 10)]
     public int Threshold { get; set; }
+    [Range(1, 1440)]
     public int AlarmIntervalMinutes { get; set; }
 }
 
@@ -84,10 +104,14 @@ public sealed class SetHrAlarmRequest
 public sealed class SetDynamicHrAlarmRequest
 {
     public bool Open { get; set; }
+    [Range(40, 220)]
     public int High { get; set; }
+    [Range(40, 220)]
     public int Low { get; set; }
     /// <summary>Duration of sustained abnormal HR before alert (seconds).</summary>
+    [Range(1, 3600)]
     public int TimeoutSeconds { get; set; }
+    [Range(1, 1440)]
     public int IntervalMinutes { get; set; }
 }
 
@@ -95,6 +119,7 @@ public sealed class SetDynamicHrAlarmRequest
 public sealed class SetSpo2AlarmRequest
 {
     public bool Open { get; set; }
+    [Range(70, 99)]
     public int LowThreshold { get; set; }
 }
 
@@ -102,9 +127,13 @@ public sealed class SetSpo2AlarmRequest
 public sealed class SetBpAlarmRequest
 {
     public bool Open { get; set; }
+    [Range(60, 280)]
     public int SbpHigh { get; set; }
+    [Range(60, 280)]
     public int SbpBelow { get; set; }
+    [Range(40, 180)]
     public int DbpHigh { get; set; }
+    [Range(40, 180)]
     public int DbpBelow { get; set; }
 }
 
@@ -112,9 +141,11 @@ public sealed class SetBpAlarmRequest
 public sealed class SetTemperatureAlarmRequest
 {
     public bool Open { get; set; }
-    /// <summary>High threshold — value × 10 (e.g. 375 = 37.5 °C).</summary>
+    /// <summary>High threshold — value × 10 (e.g. 375 = 37.5 °C, range 340–420).</summary>
+    [Range(340, 420)]
     public int High { get; set; }
-    /// <summary>Low threshold — value × 10 (e.g. 355 = 35.5 °C).</summary>
+    /// <summary>Low threshold — value × 10 (e.g. 355 = 35.5 °C, range 340–420).</summary>
+    [Range(340, 420)]
     public int Low { get; set; }
 }
 
@@ -122,7 +153,9 @@ public sealed class SetTemperatureAlarmRequest
 public sealed class SetBloodSugarAlarmRequest
 {
     public bool Open { get; set; }
+    [Range(0.0, 30.0)]
     public double Low { get; set; }
+    [Range(0.0, 30.0)]
     public double High { get; set; }
 }
 
@@ -130,7 +163,9 @@ public sealed class SetBloodSugarAlarmRequest
 public sealed class SetBloodPotassiumAlarmRequest
 {
     public bool Open { get; set; }
+    [Range(0.0, 10.0)]
     public double Low { get; set; }
+    [Range(0.0, 10.0)]
     public double High { get; set; }
 }
 
@@ -139,9 +174,11 @@ public sealed class SetAutoAfRequest
 {
     public bool Open { get; set; }
     /// <summary>Measurement interval in seconds (30–120).</summary>
+    [Range(30, 120)]
     public int IntervalSeconds { get; set; }
     public bool? RriSingleTime { get; set; }
     /// <summary>0 = general, 1 = mood.</summary>
+    [Range(0, 1)]
     public int? RriType { get; set; }
 }
 
@@ -151,6 +188,7 @@ public sealed class SetAutoAfRequest
 public sealed class SetFallSensitivityRequest
 {
     /// <summary>Default: 14000.</summary>
+    [Range(1000, 30000)]
     public int FallThreshold { get; set; } = 14000;
 }
 
@@ -158,7 +196,9 @@ public sealed class SetFallSensitivityRequest
 public sealed class SetWristGestureRequest
 {
     public bool Open { get; set; }
+    [Range(0, 23)]
     public int StartHour { get; set; }
+    [Range(0, 23)]
     public int EndHour { get; set; }
 }
 
@@ -166,8 +206,10 @@ public sealed class SetWristGestureRequest
 public sealed class SetDataFrequencyRequest
 {
     public bool GpsAutoCheck { get; set; }
+    [Range(1, 1440)]
     public int GpsIntervalMinutes { get; set; }
     /// <summary>1 = low (max saving), 2 = mid (balanced), 3 = high (always connected).</summary>
+    [Range(1, 3)]
     public int? PowerMode { get; set; }
 }
 
@@ -175,10 +217,13 @@ public sealed class SetDataFrequencyRequest
 public sealed class SetLocateDataUploadRequest
 {
     public bool DataAutoUpload { get; set; }
+    [Range(1, 1440)]
     public int DataUploadIntervalMinutes { get; set; }
     public bool AutoLocate { get; set; }
+    [Range(1, 1440)]
     public int LocateIntervalMinutes { get; set; }
     /// <summary>1 = low, 2 = mid, 3 = high.</summary>
+    [Range(1, 3)]
     public int? PowerMode { get; set; }
 }
 
@@ -186,6 +231,7 @@ public sealed class SetLocateDataUploadRequest
 public sealed class SetHrMeasureIntervalRequest
 {
     /// <summary>Minimum 1 minute.</summary>
+    [Range(1, 1440)]
     public int IntervalMinutes { get; set; }
 }
 
@@ -193,6 +239,7 @@ public sealed class SetHrMeasureIntervalRequest
 public sealed class SetOtherMeasureIntervalRequest
 {
     /// <summary>Minimum 5 minutes.</summary>
+    [Range(5, 1440)]
     public int IntervalMinutes { get; set; }
 }
 
@@ -200,6 +247,7 @@ public sealed class SetOtherMeasureIntervalRequest
 public sealed class SetGpsLocateRequest
 {
     public bool GpsAutoCheck { get; set; }
+    [Range(1, 1440)]
     public int GpsIntervalMinutes { get; set; }
     /// <summary>Force GPS to run immediately.</summary>
     public bool RunGps { get; set; }
@@ -243,9 +291,13 @@ public sealed class SetWearHandRequest
 /// <summary>Set blood-pressure calibration reference values.</summary>
 public sealed class SetBpCalibrationRequest
 {
+    [Range(60, 280)]
     public int SbpBand { get; set; }
+    [Range(40, 180)]
     public int DbpBand { get; set; }
+    [Range(60, 280)]
     public int SbpMeter { get; set; }
+    [Range(40, 180)]
     public int DbpMeter { get; set; }
 }
 
@@ -253,6 +305,7 @@ public sealed class SetBpCalibrationRequest
 public sealed class SetBpScheduleRequest
 {
     /// <summary>Up to 48 time strings (e.g. "08:00", "14:30").</summary>
+    [MaxLength(48)]
     public IReadOnlyList<string> MeasureTimes { get; set; } = [];
 }
 
@@ -261,16 +314,22 @@ public sealed class SetBpScheduleRequest
 /// <summary>Sync phonebook to a device (max 8 entries, at least 1 SOS).</summary>
 public sealed class SyncPhonebookRequest
 {
+    [MaxLength(8)]
     public IReadOnlyList<PhonebookEntryRequest> PhoneBook { get; set; } = [];
     /// <summary>1 = block all non-phonebook calls, 2 = allow all calls.</summary>
+    [Range(1, 2)]
     public int? Forbid { get; set; }
 }
 
 public sealed class PhonebookEntryRequest
 {
     /// <summary>Max 24 bytes.</summary>
+    [Required]
+    [StringLength(24)]
     public string Name { get; set; } = string.Empty;
     /// <summary>Max 20 bytes.</summary>
+    [Required]
+    [StringLength(20)]
     public string Number { get; set; } = string.Empty;
     public bool IsSos { get; set; }
 }
@@ -280,6 +339,7 @@ public sealed class PhonebookEntryRequest
 /// <summary>Set clock alarms on a device (max 5).</summary>
 public sealed class SetClockAlarmsRequest
 {
+    [MaxLength(5)]
     public IReadOnlyList<ClockAlarmEntryRequest> Alarms { get; set; } = [];
 }
 
@@ -293,14 +353,18 @@ public sealed class ClockAlarmEntryRequest
     public bool Friday { get; set; }
     public bool Saturday { get; set; }
     public bool Sunday { get; set; }
+    [Range(0, 23)]
     public int Hour { get; set; }
+    [Range(0, 59)]
     public int Minute { get; set; }
+    [StringLength(20)]
     public string Title { get; set; } = string.Empty;
 }
 
 /// <summary>Set sedentary reminders on a device (max 3).</summary>
 public sealed class SetSedentaryRequest
 {
+    [MaxLength(3)]
     public IReadOnlyList<SedentaryEntryRequest> Sedentaries { get; set; } = [];
 }
 
@@ -314,10 +378,14 @@ public sealed class SedentaryEntryRequest
     public bool Friday { get; set; }
     public bool Saturday { get; set; }
     public bool Sunday { get; set; }
+    [Range(0, 23)]
     public int StartHour { get; set; }
+    [Range(0, 23)]
     public int EndHour { get; set; }
     /// <summary>Sedentary duration threshold (units × 5 minutes).</summary>
+    [Range(1, 288)]
     public int Duration { get; set; }
     /// <summary>Step count per minute threshold.</summary>
+    [Range(0, 1000)]
     public int Threshold { get; set; }
 }

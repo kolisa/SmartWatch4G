@@ -231,3 +231,126 @@ public sealed class CallLogItemDto
     public string? AlarmLon { get; set; }
     public string ReceivedAt { get; set; } = string.Empty;
 }
+
+// ── PPG ───────────────────────────────────────────────────────────────────────
+
+/// <summary>One PPG (photoplethysmography) data packet.</summary>
+public sealed class PpgReadingDto
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string DataTime { get; set; } = string.Empty;
+    public long Seq { get; set; }
+    public int SampleCount { get; set; }
+
+    /// <summary>Decoded sample pairs as JSON — each element is [first, second] (int16 values).</summary>
+    public string RawDataJson { get; set; } = string.Empty;
+}
+
+// ── Multi-Leads ECG ───────────────────────────────────────────────────────────
+
+/// <summary>One Multi-Leads ECG packet (raw bytes, base64 encoded).</summary>
+public sealed class MultiLeadsEcgDto
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string DataTime { get; set; } = string.Empty;
+    public long Seq { get; set; }
+    public int Channels { get; set; }
+    public int SampleByteLen { get; set; }
+    public string RawDataBase64 { get; set; } = string.Empty;
+}
+
+// ── YYLPFE ────────────────────────────────────────────────────────────────────
+
+/// <summary>One YYLPFE decoded sample (physiological feature from PPG sensor).</summary>
+public sealed class YylpfeReadingDto
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string DataTime { get; set; } = string.Empty;
+    public long Seq { get; set; }
+    public int AreaUp { get; set; }
+    public int AreaDown { get; set; }
+    public int Rri { get; set; }
+    public int Motion { get; set; }
+}
+
+// ── Third-party device data ───────────────────────────────────────────────────
+
+/// <summary>Data from a third-party device paired with the wearable.</summary>
+public sealed class ThirdPartyDataDto
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string? MacAddr { get; set; }
+    public string DataTime { get; set; } = string.Empty;
+
+    // BP monitor
+    public int? BpSbp { get; set; }
+    public int? BpDbp { get; set; }
+    public int? BpHr { get; set; }
+    public int? BpPulse { get; set; }
+
+    // Weight scale
+    public float? ScaleWeight { get; set; }
+    public float? ScaleImpedance { get; set; }
+    public float? ScaleBodyFatPercentage { get; set; }
+
+    // Pulse oximeter
+    public int? OximeterSpo2 { get; set; }
+    public int? OximeterHr { get; set; }
+    public float? OximeterPi { get; set; }
+
+    // Thermometer
+    public float? BodyTemp { get; set; }
+
+    // Glucometer
+    public float? BloodGlucose { get; set; }
+
+    // Blood-ketone meter
+    public float? BloodKetones { get; set; }
+
+    // Uric-acid meter
+    public float? UricAcid { get; set; }
+}
+
+// ── Algorithm results ─────────────────────────────────────────────────────────
+
+/// <summary>Result of an ECG or AF rhythm classification call to the iwown algo service.</summary>
+public sealed class RhythmAnalysisDto
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string DataTime { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 0 = No result / interference; 1 = Sinus; 2 = Brady; 3 = Tachy;
+    /// 4 = Premature beats; 5 = Atrial fibrillation; 6 = SVT.
+    /// </summary>
+    public int Result { get; set; }
+
+    /// <summary>Heart rate (ECG only; 0 for AF analysis).</summary>
+    public int HeartRate { get; set; }
+
+    /// <summary>Signal quality: 0 = effective, -1 = too weak, 1 = interference (ECG only).</summary>
+    public int Effective { get; set; }
+
+    /// <summary>-1 = reversed signal (ECG only); 0 = normal.</summary>
+    public int Direction { get; set; }
+}
+
+/// <summary>Result of a continuous SpO2 OSAHS-risk analysis.</summary>
+public sealed class Spo2AnalysisDto
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public int Spo2Score { get; set; }
+
+    /// <summary>0 = low risk; higher values indicate greater snoring/OSAHS risk.</summary>
+    public int OsahsRisk { get; set; }
+}
+
+/// <summary>Result of a Parkinson tremor/activity analysis.</summary>
+public sealed class ParkinsonAnalysisDto
+{
+    public string DeviceId { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public int TremorScore { get; set; }
+    public int ActivityScore { get; set; }
+}

@@ -15,7 +15,7 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/devices/{deviceId}   — single device detail
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices")]
 public sealed class DeviceQueryController : ControllerBase

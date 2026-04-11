@@ -43,13 +43,17 @@ internal sealed class StubCallLogRepository : ICallLogRepository
 internal sealed class StubHealthDataRepository : IHealthDataRepository
 {
     public Task AddAsync(HealthDataRecord record, CancellationToken ct = default) => Task.CompletedTask;
-    public Task AddEcgAsync(EcgDataRecord record, CancellationToken ct = default) => Task.CompletedTask;
     public Task<IReadOnlyList<HealthDataRecord>> GetByDeviceAndDateAsync(string deviceId, string date, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<HealthDataRecord>>([]);
-    public Task<IReadOnlyList<EcgDataRecord>> GetEcgByDeviceAndDateAsync(string deviceId, string date, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<EcgDataRecord>>([]);
     public Task<IReadOnlyList<HealthDataRecord>> GetByDeviceAndTimeRangeAsync(string deviceId, string fromTime, string toTime, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<HealthDataRecord>>([]);
     public Task<HealthDataRecord?> GetLatestByDeviceAsync(string deviceId, CancellationToken ct = default) => Task.FromResult<HealthDataRecord?>(null);
     public Task<IReadOnlyList<HealthDataRecord>> GetLatestAllDevicesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<HealthDataRecord>>([]);
     public Task<IReadOnlyList<HealthDataRecord>> GetAllDevicesAndDateAsync(string date, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<HealthDataRecord>>([]);
+}
+
+internal sealed class StubEcgDataRepository : IEcgDataRepository
+{
+    public Task AddAsync(EcgDataRecord record, CancellationToken ct = default) => Task.CompletedTask;
+    public Task<IReadOnlyList<EcgDataRecord>> GetByDeviceAndDateAsync(string deviceId, string date, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<EcgDataRecord>>([]);
 }
 
 internal sealed class StubGnssTrackRepository : IGnssTrackRepository

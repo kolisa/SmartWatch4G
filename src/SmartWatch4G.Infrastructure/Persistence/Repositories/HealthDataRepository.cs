@@ -1,3 +1,5 @@
+using Dapper;
+
 using Microsoft.EntityFrameworkCore;
 
 using SmartWatch4G.Domain.Entities;
@@ -11,16 +13,10 @@ internal sealed class HealthDataRepository : IHealthDataRepository
 
     public HealthDataRepository(AppDbContext db) => _db = db;
 
-    public async Task AddAsync(HealthDataRecord record, CancellationToken cancellationToken = default)
+    public Task AddAsync(HealthDataRecord record, CancellationToken cancellationToken = default)
     {
         _db.HealthDataRecords.Add(record);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task AddEcgAsync(EcgDataRecord record, CancellationToken cancellationToken = default)
-    {
-        _db.EcgDataRecords.Add(record);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<HealthDataRecord>> GetByDeviceAndDateAsync(
@@ -37,24 +33,6 @@ internal sealed class HealthDataRepository : IHealthDataRepository
                         && string.Compare(x.DataTime, from, StringComparison.Ordinal) >= 0
                         && string.Compare(x.DataTime, to, StringComparison.Ordinal) <= 0)
             .OrderBy(x => x.DataTime)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    public async Task<IReadOnlyList<EcgDataRecord>> GetEcgByDeviceAndDateAsync(
-        string deviceId,
-        string date,
-        CancellationToken cancellationToken = default)
-    {
-        string from = $"{date} 00:00:00";
-        string to = $"{date} 23:59:59";
-
-        return await _db.EcgDataRecords
-            .AsNoTracking()
-            .Where(x => x.DeviceId == deviceId
-                        && string.Compare(x.DataTime, from, StringComparison.Ordinal) >= 0
-                        && string.Compare(x.DataTime, to, StringComparison.Ordinal) <= 0)
-            .OrderBy(x => x.Seq)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -87,18 +65,21 @@ internal sealed class HealthDataRepository : IHealthDataRepository
     public async Task<IReadOnlyList<HealthDataRecord>> GetLatestAllDevicesAsync(
         CancellationToken cancellationToken = default)
     {
-        // Subquery: max DataTime per device, then join to get the full record
-        var latestPerDevice = _db.HealthDataRecords
-            .GroupBy(r => r.DeviceId)
-            .Select(g => new { DeviceId = g.Key, MaxDataTime = g.Max(r => r.DataTime)! });
-
+        // ROW_NUMBER() window function: one pass over the table, no cross-join.
+        // With 100 000 devices the old GroupBy+Join created a correlated sub-query
+        // that caused a full table scan for every device.
         return await _db.HealthDataRecords
+            .FromSqlRaw("""
+                SELECT *
+                FROM (
+                    SELECT *,
+                           ROW_NUMBER() OVER (PARTITION BY DeviceId ORDER BY DataTime DESC) AS _rn
+                    FROM   HealthDataRecords
+                ) t
+                WHERE _rn = 1
+                ORDER BY DeviceId
+                """)
             .AsNoTracking()
-            .Join(latestPerDevice,
-                  r => new { r.DeviceId, r.DataTime },
-                  l => new { l.DeviceId, DataTime = l.MaxDataTime },
-                  (r, _) => r)
-            .OrderBy(r => r.DeviceId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }

@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -7,7 +9,14 @@ public sealed class GnssTrackRecord
 {
     public int Id { get; set; }
     public string? DeviceId { get; set; }
-    public string TrackTime { get; set; } = string.Empty;
+
+    private string _trackTime = string.Empty;
+    public string TrackTime
+    {
+        get => _trackTime;
+        set => _trackTime = Guard.NotNullOrWhiteSpace(value, nameof(TrackTime));
+    }
+
     public double Longitude { get; set; }
     public double Latitude { get; set; }
     public int GpsType { get; set; }

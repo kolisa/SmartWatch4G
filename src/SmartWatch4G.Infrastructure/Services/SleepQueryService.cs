@@ -2,7 +2,7 @@ using System.Text.Json;
 
 using Microsoft.Extensions.Logging;
 
-using SmartWatch4G.Application.Utilities;
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
@@ -30,17 +30,20 @@ public sealed class SleepQueryService : ISleepQueryService
     private readonly IRriDataRepository _rriRepo;
     private readonly IWownAlgoClient _algoClient;
     private readonly ILogger<SleepQueryService> _logger;
+    private readonly IDateTimeService _dt;
 
     public SleepQueryService(
         ISleepDataRepository sleepRepo,
         IRriDataRepository rriRepo,
         IWownAlgoClient algoClient,
-        ILogger<SleepQueryService> logger)
+        ILogger<SleepQueryService> logger,
+        IDateTimeService dt)
     {
         _sleepRepo = sleepRepo;
         _rriRepo = rriRepo;
         _algoClient = algoClient;
         _logger = logger;
+        _dt = dt;
     }
 
     public async Task<ServiceResult<IReadOnlyList<SleepResult>>> GetSleepResultsByDateRangeAsync(
@@ -49,8 +52,8 @@ public sealed class SleepQueryService : ISleepQueryService
         string toDate,
         CancellationToken cancellationToken = default)
     {
-        System.DateTime? from = DateTimeUtilities.TryParseDate(fromDate);
-        System.DateTime? to = DateTimeUtilities.TryParseDate(toDate);
+        System.DateTime? from = _dt.TryParseDate(fromDate);
+        System.DateTime? to = _dt.TryParseDate(toDate);
 
         if (from is null || to is null)
         {
@@ -82,7 +85,7 @@ public sealed class SleepQueryService : ISleepQueryService
         string sleepDate,
         CancellationToken cancellationToken = default)
     {
-        string prevDate = DateTimeUtilities.GetPreviousDay(sleepDate);
+        string prevDate = _dt.GetPreviousDay(sleepDate);
         if (string.IsNullOrEmpty(prevDate))
         {
             _logger.LogWarning("Invalid sleepDate: {Date}", sleepDate);

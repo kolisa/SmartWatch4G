@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -9,7 +11,13 @@ public sealed class Spo2DataRecord
 {
     public int Id { get; set; }
     public string? DeviceId { get; set; }
-    public string DataTime { get; set; } = string.Empty;
+
+    private string _dataTime = string.Empty;
+    public string DataTime
+    {
+        get => _dataTime;
+        set => _dataTime = Guard.NotNullOrWhiteSpace(value, nameof(DataTime));
+    }
 
     /// <summary>SPO2 percentage value (0-100).</summary>
     public int Spo2 { get; set; }

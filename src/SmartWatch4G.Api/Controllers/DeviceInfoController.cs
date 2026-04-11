@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 
@@ -19,13 +20,16 @@ namespace SmartWatch4G.Api.Controllers;
 public sealed class DeviceInfoController : ControllerBase
 {
     private readonly IDeviceInfoRepository _deviceInfoRepo;
+    private readonly IUnitOfWork _uow;
     private readonly ILogger<DeviceInfoController> _logger;
 
     public DeviceInfoController(
         IDeviceInfoRepository deviceInfoRepo,
+        IUnitOfWork uow,
         ILogger<DeviceInfoController> logger)
     {
         _deviceInfoRepo = deviceInfoRepo;
+        _uow = uow;
         _logger = logger;
     }
 
@@ -40,7 +44,7 @@ public sealed class DeviceInfoController : ControllerBase
         {
             using var reader = new StreamReader(Request.Body);
             string body = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
-            _logger.LogInformation("UploadDeviceInfo payload: {Body}", body);
+            _logger.LogDebug("UploadDeviceInfo payload: {Body}", body);
 
             dto = JsonSerializer.Deserialize<DeviceInfoDto>(body);
             if (dto is null)
@@ -84,6 +88,7 @@ public sealed class DeviceInfoController : ControllerBase
                 CommunicationMode = dto.CommunicationMode,
                 WatchEvent = dto.WatchEvent
             }, ct).ConfigureAwait(false);
+            await _uow.CommitAsync(ct).ConfigureAwait(false);
 
             _logger.LogInformation(
                 "UploadDeviceInfo — exit, upserted device {DeviceId}", dto.DeviceId);
