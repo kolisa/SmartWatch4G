@@ -3,6 +3,8 @@
 A **.NET 10** ASP.NET Core Web API built with **Clean Architecture**, fully aligned with the
 [iwown IoT 1.0.1 documentation](https://api8.iwown.com/iot_platform/index.html).
 
+**Reference:** [iwown IoT RESTful API specification](https://iwap1.iwown.com/iot_platform/restful.html)
+
 ---
 
 ## Architecture
