@@ -13,3 +13,8 @@ publish/
 ## OS
 .DS_Store
 Thumbs.db
+
+# IIS deployment — contains production credentials
+src/SmartWatch4G.Api/web.config
+src/SmartWatch4G.Api/appsettings.Production.json
+src/SmartWatch4G.Api/appsettings.Development.json

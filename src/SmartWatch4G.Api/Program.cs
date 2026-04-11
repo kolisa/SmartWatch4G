@@ -104,21 +104,18 @@ try
 
     WebApplication app = builder.Build();
 
-    // ── Auto-migrate on startup (skipped in Testing environment) ─────────────
-    if (!app.Environment.IsEnvironment("Testing"))
+    // ── Auto-migrate on startup (Development only; Production uses CI/CD pipeline migrations) ──
+    if (app.Environment.IsDevelopment())
     {
         using IServiceScope scope = app.Services.CreateScope();
         AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
     }
 
-    // ── HTTP pipeline ─────────────────────────────────────────────────────────
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI(options =>
-            options.SwaggerEndpoint("/swagger/v1/swagger.json", "4G Wearable API v1"));
-    }
+    // ── Swagger (all environments) ────────────────────────────────────────────
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "4G Wearable API v1"));
 
     app.UseCors();
     app.UseSerilogRequestLogging();
