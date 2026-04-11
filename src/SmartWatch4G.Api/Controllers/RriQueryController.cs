@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -14,20 +13,23 @@ namespace SmartWatch4G.Api.Controllers;
 /// Route: GET /api/devices/{deviceId}/rri?date=
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/rri")]
 public sealed class RriQueryController : ControllerBase
 {
     private readonly IRriQueryService _rriService;
     private readonly ILogger<RriQueryController> _logger;
+    private readonly IDateTimeService _dt;
 
     public RriQueryController(
         IRriQueryService rriService,
-        ILogger<RriQueryController> logger)
+        ILogger<RriQueryController> logger,
+        IDateTimeService dt)
     {
         _rriService = rriService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>Returns RRI readings for the given device and date.</summary>
@@ -41,7 +43,7 @@ public sealed class RriQueryController : ControllerBase
         _logger.LogInformation(
             "GetRri — entry, device: {DeviceId}, date: {Date}", deviceId, date);
 
-        if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
+        if (string.IsNullOrWhiteSpace(deviceId) || !_dt.IsValidDate(date))
         {
             _logger.LogWarning(
                 "GetRri — invalid parameters, device: {DeviceId}, date: {Date}", deviceId, date);

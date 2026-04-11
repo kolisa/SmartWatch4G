@@ -1,3 +1,5 @@
+using Dapper;
+
 using Microsoft.EntityFrameworkCore;
 
 using SmartWatch4G.Application.Utilities;
@@ -12,10 +14,10 @@ internal sealed class DeviceStatusRepository : IDeviceStatusRepository
 
     public DeviceStatusRepository(AppDbContext db) => _db = db;
 
-    public async Task AddAsync(DeviceStatusRecord record, CancellationToken cancellationToken = default)
+    public Task AddAsync(DeviceStatusRecord record, CancellationToken cancellationToken = default)
     {
         _db.DeviceStatusRecords.Add(record);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<DeviceStatusRecord>> GetByDeviceAndDateAsync(
@@ -49,19 +51,16 @@ internal sealed class DeviceStatusRepository : IDeviceStatusRepository
     public async Task<IReadOnlyList<DeviceStatusRecord>> GetLatestAllDevicesAsync(
         CancellationToken cancellationToken = default)
     {
-        // Subquery: max ReceivedAt per device, then join to get the full record
-        var latestPerDevice = _db.DeviceStatusRecords
-            .GroupBy(r => r.DeviceId)
-            .Select(g => new { DeviceId = g.Key, MaxReceivedAt = g.Max(r => r.ReceivedAt) });
-
-        return await _db.DeviceStatusRecords
-            .AsNoTracking()
-            .Join(latestPerDevice,
-                  r => new { r.DeviceId, r.ReceivedAt },
-                  l => new { l.DeviceId, ReceivedAt = l.MaxReceivedAt },
-                  (r, _) => r)
-            .OrderBy(r => r.DeviceId)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        using var conn = new Microsoft.Data.SqlClient.SqlConnection(
+            _db.Database.GetConnectionString());
+        return (await conn.QueryAsync<DeviceStatusRecord>("""
+            SELECT *
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY DeviceId ORDER BY ReceivedAt DESC) AS _rn
+                FROM   DeviceStatusRecords
+            ) t
+            WHERE t._rn = 1
+            ORDER BY DeviceId
+            """)).AsList();
     }
 }

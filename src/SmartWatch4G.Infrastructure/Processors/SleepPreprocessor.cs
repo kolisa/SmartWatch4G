@@ -127,7 +127,7 @@ public sealed class SleepPreprocessor
             return;
         }
 
-        _logger.LogInformation("{Time} seq:{Seq} — sleep slot: {Json}", dataTime, hisNotify.HisData.Seq, sleepJson);
+        _logger.LogDebug("{Time} seq:{Seq} — sleep slot: {Json}", dataTime, hisNotify.HisData.Seq, sleepJson);
 
         // Sleep date is determined by the timestamp's date component
         string sleepDate = dataTime.Length >= 10 ? dataTime[..10] : dataTime;

@@ -1,6 +1,5 @@
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 
 namespace SmartWatch4G.Infrastructure.Services;
@@ -13,19 +12,22 @@ public sealed class DeviceQueryService : IDeviceQueryService
 {
     private readonly IDeviceInfoRepository _deviceInfoRepo;
     private readonly IDeviceStatusRepository _statusRepo;
+    private readonly IDateTimeService _dt;
 
     public DeviceQueryService(
         IDeviceInfoRepository deviceInfoRepo,
-        IDeviceStatusRepository statusRepo)
+        IDeviceStatusRepository statusRepo,
+        IDateTimeService dt)
     {
         _deviceInfoRepo = deviceInfoRepo;
         _statusRepo = statusRepo;
+        _dt = dt;
     }
 
     public async Task<IReadOnlyList<DeviceSummaryDto>> GetAllDevicesAsync(
         string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var records = await _deviceInfoRepo.GetAllAsync(ct).ConfigureAwait(false);
 
         return records.Select(r => new DeviceSummaryDto
@@ -35,14 +37,14 @@ public sealed class DeviceQueryService : IDeviceQueryService
             Version = r.Version,
             WearingStatus = r.WearingStatus,
             NetworkStatus = r.NetworkStatus,
-            UpdatedAt = DateTimeUtilities.LocalizeDateTime(r.UpdatedAt, tzInfo)
+            UpdatedAt = _dt.LocalizeDateTime(r.UpdatedAt, tzInfo)
         }).ToList();
     }
 
     public async Task<DeviceDetailDto?> GetDeviceAsync(
         string deviceId, string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var r = await _deviceInfoRepo.FindByDeviceIdAsync(deviceId, ct).ConfigureAwait(false);
 
         if (r is null) return null;
@@ -67,31 +69,31 @@ public sealed class DeviceQueryService : IDeviceQueryService
             Band = r.Band,
             CommunicationMode = r.CommunicationMode,
             WatchEvent = r.WatchEvent,
-            CreatedAt = DateTimeUtilities.LocalizeDateTime(r.CreatedAt, tzInfo),
-            UpdatedAt = DateTimeUtilities.LocalizeDateTime(r.UpdatedAt, tzInfo)
+            CreatedAt = _dt.LocalizeDateTime(r.CreatedAt, tzInfo),
+            UpdatedAt = _dt.LocalizeDateTime(r.UpdatedAt, tzInfo)
         };
     }
 
     public async Task<IReadOnlyList<DeviceStatusItemDto>> GetStatusByDateAsync(
         string deviceId, string date, string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var records = await _statusRepo.GetByDeviceAndDateAsync(deviceId, date, ct)
             .ConfigureAwait(false);
 
         return records.Select(r => new DeviceStatusItemDto
         {
             DeviceId = r.DeviceId,
-            EventTime = DateTimeUtilities.LocalizeTimestamp(r.EventTime, tzInfo),
+            EventTime = _dt.LocalizeTimestamp(r.EventTime, tzInfo),
             Status = r.Status,
-            ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tzInfo)
+            ReceivedAt = _dt.LocalizeDateTime(r.ReceivedAt, tzInfo)
         }).ToList();
     }
 
     public async Task<DeviceStatusItemDto?> GetLatestStatusAsync(
         string deviceId, string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var r = await _statusRepo.GetLatestByDeviceAsync(deviceId, ct).ConfigureAwait(false);
 
         if (r is null) return null;
@@ -99,24 +101,24 @@ public sealed class DeviceQueryService : IDeviceQueryService
         return new DeviceStatusItemDto
         {
             DeviceId = r.DeviceId,
-            EventTime = DateTimeUtilities.LocalizeTimestamp(r.EventTime, tzInfo),
+            EventTime = _dt.LocalizeTimestamp(r.EventTime, tzInfo),
             Status = r.Status,
-            ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tzInfo)
+            ReceivedAt = _dt.LocalizeDateTime(r.ReceivedAt, tzInfo)
         };
     }
 
     public async Task<IReadOnlyList<DeviceStatusItemDto>> GetLatestStatusAllDevicesAsync(
         string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var records = await _statusRepo.GetLatestAllDevicesAsync(ct).ConfigureAwait(false);
 
         return records.Select(r => new DeviceStatusItemDto
         {
             DeviceId = r.DeviceId,
-            EventTime = DateTimeUtilities.LocalizeTimestamp(r.EventTime, tzInfo),
+            EventTime = _dt.LocalizeTimestamp(r.EventTime, tzInfo),
             Status = r.Status,
-            ReceivedAt = DateTimeUtilities.LocalizeDateTime(r.ReceivedAt, tzInfo)
+            ReceivedAt = _dt.LocalizeDateTime(r.ReceivedAt, tzInfo)
         }).ToList();
     }
 }

@@ -43,6 +43,7 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
             Replace<IAlarmRepository, StubAlarmRepository>(services);
             Replace<ICallLogRepository, StubCallLogRepository>(services);
             Replace<IHealthDataRepository, StubHealthDataRepository>(services);
+            Replace<IEcgDataRepository, StubEcgDataRepository>(services);
             Replace<IGnssTrackRepository, StubGnssTrackRepository>(services);
             Replace<ISleepDataRepository, StubSleepDataRepository>(services);
             Replace<IRriDataRepository, StubRriDataRepository>(services);

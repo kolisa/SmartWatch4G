@@ -11,10 +11,10 @@ internal sealed class RriDataRepository : IRriDataRepository
 
     public RriDataRepository(AppDbContext db) => _db = db;
 
-    public async Task AddAsync(RriDataRecord record, CancellationToken cancellationToken = default)
+    public Task AddAsync(RriDataRecord record, CancellationToken cancellationToken = default)
     {
         _db.RriDataRecords.Add(record);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<RriDataRecord>> GetByDeviceAndDateAsync(

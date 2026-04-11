@@ -22,7 +22,7 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/devices/{deviceId}/location/latest   — most-recent GPS point
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/location")]
 public sealed class LocationQueryController : ControllerBase

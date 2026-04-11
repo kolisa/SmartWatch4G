@@ -610,6 +610,198 @@ namespace SmartWatch4G.Infrastructure.Migrations
 
                     b.ToTable("Spo2DataRecords");
                 });
+
+            modelBuilder.Entity("SmartWatch4G.Domain.Entities.PpgDataRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DataTime")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("RawDataJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SampleCount")
+                        .HasColumnType("int");
+
+                    b.Property<long>("Seq")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "DataTime");
+
+                    b.ToTable("PpgDataRecords");
+                });
+
+            modelBuilder.Entity("SmartWatch4G.Domain.Entities.MultiLeadsEcgRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Channels")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DataTime")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("RawDataBase64")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SampleByteLen")
+                        .HasColumnType("int");
+
+                    b.Property<long>("Seq")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "DataTime");
+
+                    b.ToTable("MultiLeadsEcgRecords");
+                });
+
+            modelBuilder.Entity("SmartWatch4G.Domain.Entities.YylpfeRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AreaDown")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AreaUp")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DataTime")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("Motion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Rri")
+                        .HasColumnType("int");
+
+                    b.Property<long>("Seq")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "DataTime");
+
+                    b.ToTable("YylpfeRecords");
+                });
+
+            modelBuilder.Entity("SmartWatch4G.Domain.Entities.ThirdPartyDataRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<float?>("BloodGlucose")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("BloodKetones")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("BodyTemp")
+                        .HasColumnType("real");
+
+                    b.Property<int?>("BpDbp")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BpHr")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BpPulse")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BpSbp")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DataTime")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("MacAddr")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int?>("OximeterHr")
+                        .HasColumnType("int");
+
+                    b.Property<float?>("OximeterPi")
+                        .HasColumnType("real");
+
+                    b.Property<int?>("OximeterSpo2")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<float?>("ScaleBodyFatPercentage")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("ScaleImpedance")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("ScaleWeight")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("UricAcid")
+                        .HasColumnType("real");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "DataTime");
+
+                    b.ToTable("ThirdPartyDataRecords");
+                });
 #pragma warning restore 612, 618
         }
     }

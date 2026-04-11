@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -15,20 +14,23 @@ namespace SmartWatch4G.Api.Controllers;
 /// Supports filtering by <c>?date=yyyy-MM-dd</c> or <c>?from=...&amp;to=...</c>.
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/call-logs")]
 public sealed class CallLogQueryController : ControllerBase
 {
     private readonly ICallLogQueryService _callLogService;
     private readonly ILogger<CallLogQueryController> _logger;
+    private readonly IDateTimeService _dt;
 
     public CallLogQueryController(
         ICallLogQueryService callLogService,
-        ILogger<CallLogQueryController> logger)
+        ILogger<CallLogQueryController> logger,
+        IDateTimeService dt)
     {
         _callLogService = callLogService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>
@@ -60,7 +62,7 @@ public sealed class CallLogQueryController : ControllerBase
         {
             if (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
             {
-                if (!DateTimeUtilities.IsValidDateTime(from) || !DateTimeUtilities.IsValidDateTime(to))
+                if (!_dt.IsValidDateTime(from) || !_dt.IsValidDateTime(to))
                 {
                     _logger.LogWarning(
                         "GetCallLogs — invalid datetime range, from: {From}, to: {To}", from, to);
@@ -71,7 +73,7 @@ public sealed class CallLogQueryController : ControllerBase
                 data = await _callLogService.GetByRangeAsync(deviceId, from, to, tz, ct)
                     .ConfigureAwait(false);
             }
-            else if (DateTimeUtilities.IsValidDate(date))
+            else if (_dt.IsValidDate(date))
             {
                 filterDesc = $"date {date}";
                 data = await _callLogService.GetByDateAsync(deviceId, date!, tz, ct)

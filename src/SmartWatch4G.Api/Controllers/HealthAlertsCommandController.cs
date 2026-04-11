@@ -23,7 +23,7 @@ namespace SmartWatch4G.Api.Controllers;
 ///   PUT autoaf           — auto atrial-fibrillation monitoring
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/alerts")]
 public sealed class HealthAlertsCommandController : ControllerBase

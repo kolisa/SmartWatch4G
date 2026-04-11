@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -14,20 +13,23 @@ namespace SmartWatch4G.Api.Controllers;
 /// Route: GET /api/devices/{deviceId}/health/daily-stats?date=
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/health/daily-stats")]
 public sealed class HealthDailyStatsController : ControllerBase
 {
     private readonly IHealthQueryService _healthService;
     private readonly ILogger<HealthDailyStatsController> _logger;
+    private readonly IDateTimeService _dt;
 
     public HealthDailyStatsController(
         IHealthQueryService healthService,
-        ILogger<HealthDailyStatsController> logger)
+        ILogger<HealthDailyStatsController> logger,
+        IDateTimeService dt)
     {
         _healthService = healthService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>
@@ -43,7 +45,7 @@ public sealed class HealthDailyStatsController : ControllerBase
         _logger.LogInformation(
             "GetDailyStats — entry, device: {DeviceId}, date: {Date}", deviceId, date);
 
-        if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
+        if (string.IsNullOrWhiteSpace(deviceId) || !_dt.IsValidDate(date))
         {
             _logger.LogWarning(
                 "GetDailyStats — invalid parameters, device: {DeviceId}, date: {Date}",

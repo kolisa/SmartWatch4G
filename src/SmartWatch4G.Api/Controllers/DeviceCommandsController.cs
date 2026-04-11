@@ -22,7 +22,7 @@ namespace SmartWatch4G.Api.Controllers;
 ///   POST /api/v1/devices/{deviceId}/commands/goal      — set activity goals
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}")]
 public sealed class DeviceCommandsController : ControllerBase

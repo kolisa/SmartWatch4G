@@ -88,6 +88,174 @@ public sealed class WownAlgoClient : IWownAlgoClient
         };
     }
 
+    /// <inheritdoc/>
+    public async Task<RhythmCalcResult?> CalculateEcgAsync(
+        EcgCalcRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            ecg_list = request.EcgList,
+            device_id = request.DeviceId,
+            account = _options.Account,
+            password = _options.Password
+        };
+
+        AlgoResponse<EcgAlgoData>? response;
+        try
+        {
+            var httpResp = await _http.PostAsJsonAsync(
+                "/calculation/ecg", body, cancellationToken).ConfigureAwait(false);
+            httpResp.EnsureSuccessStatusCode();
+            response = await httpResp.Content
+                .ReadFromJsonAsync<AlgoResponse<EcgAlgoData>>(cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("iwown ECG algo call failed: {Message}", ex.Message);
+            return null;
+        }
+
+        if (response is null || response.ReturnCode != 0 || response.Data is null)
+        {
+            _logger.LogWarning("iwown ECG algo returned code {Code}: {Msg}", response?.ReturnCode, response?.Message);
+            return null;
+        }
+
+        return new RhythmCalcResult
+        {
+            Result = response.Data.Result,
+            HeartRate = response.Data.Hr,
+            Effective = response.Data.Effective,
+            Direction = response.Data.Direction
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<RhythmCalcResult?> CalculateAfAsync(
+        AfCalcRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            rri_list = request.RriList,
+            device_id = request.DeviceId,
+            account = _options.Account,
+            password = _options.Password
+        };
+
+        AlgoResponse<AfAlgoData>? response;
+        try
+        {
+            var httpResp = await _http.PostAsJsonAsync(
+                "/calculation/af", body, cancellationToken).ConfigureAwait(false);
+            httpResp.EnsureSuccessStatusCode();
+            response = await httpResp.Content
+                .ReadFromJsonAsync<AlgoResponse<AfAlgoData>>(cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("iwown AF algo call failed: {Message}", ex.Message);
+            return null;
+        }
+
+        if (response is null || response.ReturnCode != 0 || response.Data is null)
+        {
+            _logger.LogWarning("iwown AF algo returned code {Code}: {Msg}", response?.ReturnCode, response?.Message);
+            return null;
+        }
+
+        return new RhythmCalcResult { Result = response.Data.Result };
+    }
+
+    /// <inheritdoc/>
+    public async Task<Spo2CalcResult?> CalculateSpo2Async(
+        Spo2CalcRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            spo2_list = request.Spo2List,
+            device_id = request.DeviceId,
+            account = _options.Account,
+            password = _options.Password
+        };
+
+        AlgoResponse<Spo2AlgoData>? response;
+        try
+        {
+            var httpResp = await _http.PostAsJsonAsync(
+                "/calculation/spo2", body, cancellationToken).ConfigureAwait(false);
+            httpResp.EnsureSuccessStatusCode();
+            response = await httpResp.Content
+                .ReadFromJsonAsync<AlgoResponse<Spo2AlgoData>>(cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("iwown SpO2 algo call failed: {Message}", ex.Message);
+            return null;
+        }
+
+        if (response is null || response.ReturnCode != 0 || response.Data is null)
+        {
+            _logger.LogWarning("iwown SpO2 algo returned code {Code}: {Msg}", response?.ReturnCode, response?.Message);
+            return null;
+        }
+
+        return new Spo2CalcResult
+        {
+            Spo2Score = response.Data.Spo2Score,
+            OsahsRisk = response.Data.OsahsRisk
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<ParkinsonCalcResult?> CalculateParkinsonAsync(
+        ParkinsonCalcRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            acc_x = request.AccXList,
+            acc_y = request.AccYList,
+            acc_z = request.AccZList,
+            device_id = request.DeviceId,
+            account = _options.Account,
+            password = _options.Password
+        };
+
+        AlgoResponse<ParkinsonAlgoData>? response;
+        try
+        {
+            var httpResp = await _http.PostAsJsonAsync(
+                "/calculation/parkinson/acc", body, cancellationToken).ConfigureAwait(false);
+            httpResp.EnsureSuccessStatusCode();
+            response = await httpResp.Content
+                .ReadFromJsonAsync<AlgoResponse<ParkinsonAlgoData>>(cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("iwown Parkinson algo call failed: {Message}", ex.Message);
+            return null;
+        }
+
+        if (response is null || response.ReturnCode != 0 || response.Data is null)
+        {
+            _logger.LogWarning("iwown Parkinson algo returned code {Code}: {Msg}", response?.ReturnCode, response?.Message);
+            return null;
+        }
+
+        return new ParkinsonCalcResult
+        {
+            TremorScore = response.Data.TremorScore,
+            ActivityScore = response.Data.ActivityScore
+        };
+    }
+
     // ── Private DTOs (API contract; not part of the domain) ──────────────────
 
     private sealed class AlgoResponse<T>
@@ -130,6 +298,45 @@ public sealed class WownAlgoClient : IWownAlgoClient
 
         [JsonPropertyName("type")]
         public int Type { get; init; }
+    }
+
+    private sealed class EcgAlgoData
+    {
+        [JsonPropertyName("result")]
+        public int Result { get; init; }
+
+        [JsonPropertyName("hr")]
+        public int Hr { get; init; }
+
+        [JsonPropertyName("effective")]
+        public int Effective { get; init; }
+
+        [JsonPropertyName("direction")]
+        public int Direction { get; init; }
+    }
+
+    private sealed class AfAlgoData
+    {
+        [JsonPropertyName("result")]
+        public int Result { get; init; }
+    }
+
+    private sealed class Spo2AlgoData
+    {
+        [JsonPropertyName("spo2_score")]
+        public int Spo2Score { get; init; }
+
+        [JsonPropertyName("osahs_risk")]
+        public int OsahsRisk { get; init; }
+    }
+
+    private sealed class ParkinsonAlgoData
+    {
+        [JsonPropertyName("tremor_score")]
+        public int TremorScore { get; init; }
+
+        [JsonPropertyName("activity_score")]
+        public int ActivityScore { get; init; }
     }
 }
 

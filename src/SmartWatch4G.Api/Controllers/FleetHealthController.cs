@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -16,20 +15,23 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/fleet/health/summary?date= — aggregated daily health stats per device
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetHealthController : ControllerBase
 {
     private readonly IHealthQueryService _healthService;
     private readonly ILogger<FleetHealthController> _logger;
+    private readonly IDateTimeService _dt;
 
     public FleetHealthController(
         IHealthQueryService healthService,
-        ILogger<FleetHealthController> logger)
+        ILogger<FleetHealthController> logger,
+        IDateTimeService dt)
     {
         _healthService = healthService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>Returns the most recent health snapshot for every device.</summary>
@@ -64,7 +66,7 @@ public sealed class FleetHealthController : ControllerBase
     {
         _logger.LogInformation("GetFleetHealthSummary — entry, date: {Date}", date);
 
-        if (!DateTimeUtilities.IsValidDate(date))
+        if (!_dt.IsValidDate(date))
         {
             _logger.LogWarning("GetFleetHealthSummary — invalid date: {Date}", date);
             return BadRequest(new ApiListResponse<HealthDailyStatsDto> { ReturnCode = 400 });

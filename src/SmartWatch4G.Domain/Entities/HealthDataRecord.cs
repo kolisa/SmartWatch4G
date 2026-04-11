@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -9,7 +11,14 @@ public sealed class HealthDataRecord
 {
     public int Id { get; set; }
     public string? DeviceId { get; set; }
-    public string DataTime { get; set; } = string.Empty;
+
+    private string _dataTime = string.Empty;
+    public string DataTime
+    {
+        get => _dataTime;
+        set => _dataTime = Guard.NotNullOrWhiteSpace(value, nameof(DataTime));
+    }
+
     public long Seq { get; set; }
 
     // Steps / activity

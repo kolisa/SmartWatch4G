@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Common;
+
 namespace SmartWatch4G.Domain.Entities;
 
 /// <summary>
@@ -13,9 +15,19 @@ public sealed class AlarmEventRecord
     /// "THROMBUS", "LOW_POWER", "POWER_OFF", "NOT_WEARING", "PHONE_INTERCEPT",
     /// "BLOOD_POTASSIUM", "BLOOD_SUGAR".
     /// </summary>
-    public string AlarmType { get; set; } = string.Empty;
+    private string _alarmType = string.Empty;
+    public string AlarmType
+    {
+        get => _alarmType;
+        set => _alarmType = Guard.NotNullOrWhiteSpace(value, nameof(AlarmType));
+    }
 
-    public string AlarmTime { get; set; } = string.Empty;
+    private string _alarmTime = string.Empty;
+    public string AlarmTime
+    {
+        get => _alarmTime;
+        set => _alarmTime = Guard.NotNullOrWhiteSpace(value, nameof(AlarmTime));
+    }
 
     /// <summary>Primary numeric value (e.g. HR bpm, SpO2 %, Sbp, temperature).</summary>
     public double? Value1 { get; set; }

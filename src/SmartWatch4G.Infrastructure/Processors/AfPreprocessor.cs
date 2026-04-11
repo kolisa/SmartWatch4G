@@ -61,7 +61,7 @@ public sealed class AfPreprocessor
             rriList.Add(raw & 0x0000_ffff);
         }
 
-        _logger.LogInformation("AF RRI {Time} — count: {Count}", dataTime, rriList.Count);
+        _logger.LogDebug("AF RRI {Time} — count: {Count}", dataTime, rriList.Count);
 
         await _rriRepo.AddAsync(new RriDataRecord
         {

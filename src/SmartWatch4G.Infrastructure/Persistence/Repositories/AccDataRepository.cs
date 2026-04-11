@@ -11,10 +11,10 @@ internal sealed class AccDataRepository : IAccDataRepository
 
     public AccDataRepository(AppDbContext db) => _db = db;
 
-    public async Task AddAsync(AccDataRecord record, CancellationToken cancellationToken = default)
+    public Task AddAsync(AccDataRecord record, CancellationToken cancellationToken = default)
     {
         _db.AccDataRecords.Add(record);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<AccDataRecord>> GetByDeviceAndDateRangeAsync(

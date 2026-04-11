@@ -1,6 +1,5 @@
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces.Repositories;
 
@@ -14,14 +13,18 @@ namespace SmartWatch4G.Infrastructure.Services;
 public sealed class HealthQueryService : IHealthQueryService
 {
     private readonly IHealthDataRepository _healthRepo;
+    private readonly IDateTimeService _dt;
 
-    public HealthQueryService(IHealthDataRepository healthRepo)
-        => _healthRepo = healthRepo;
+    public HealthQueryService(IHealthDataRepository healthRepo, IDateTimeService dt)
+    {
+        _healthRepo = healthRepo;
+        _dt = dt;
+    }
 
     public async Task<IReadOnlyList<HealthSnapshotDto>> GetSnapshotsByDateAsync(
         string deviceId, string date, string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var records = await _healthRepo.GetByDeviceAndDateAsync(deviceId, date, ct)
             .ConfigureAwait(false);
         return Map(records, tzInfo);
@@ -30,7 +33,7 @@ public sealed class HealthQueryService : IHealthQueryService
     public async Task<IReadOnlyList<HealthSnapshotDto>> GetSnapshotsByRangeAsync(
         string deviceId, string from, string to, string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var records = await _healthRepo.GetByDeviceAndTimeRangeAsync(deviceId, from, to, ct)
             .ConfigureAwait(false);
         return Map(records, tzInfo);
@@ -39,7 +42,7 @@ public sealed class HealthQueryService : IHealthQueryService
     public async Task<HealthSnapshotDto?> GetLatestSnapshotAsync(
         string deviceId, string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var r = await _healthRepo.GetLatestByDeviceAsync(deviceId, ct).ConfigureAwait(false);
         return r is null ? null : MapOne(r, tzInfo);
     }
@@ -56,7 +59,7 @@ public sealed class HealthQueryService : IHealthQueryService
     public async Task<IReadOnlyList<HealthSnapshotDto>> GetLatestSnapshotAllDevicesAsync(
         string? tz, CancellationToken ct = default)
     {
-        TimeZoneInfo? tzInfo = DateTimeUtilities.TryGetTimeZone(tz);
+        TimeZoneInfo? tzInfo = _dt.TryGetTimeZone(tz);
         var records = await _healthRepo.GetLatestAllDevicesAsync(ct).ConfigureAwait(false);
         return Map(records, tzInfo);
     }
@@ -75,14 +78,14 @@ public sealed class HealthQueryService : IHealthQueryService
 
     // ── Mapping ───────────────────────────────────────────────────────────────
 
-    private static IReadOnlyList<HealthSnapshotDto> Map(
+    private IReadOnlyList<HealthSnapshotDto> Map(
         IEnumerable<HealthDataRecord> records, TimeZoneInfo? tz)
         => records.Select(r => MapOne(r, tz)).ToList();
 
-    private static HealthSnapshotDto MapOne(HealthDataRecord r, TimeZoneInfo? tz) => new()
+    private HealthSnapshotDto MapOne(HealthDataRecord r, TimeZoneInfo? tz) => new()
     {
         DeviceId = r.DeviceId ?? string.Empty,
-        DataTime = DateTimeUtilities.LocalizeTimestamp(r.DataTime, tz),
+        DataTime = _dt.LocalizeTimestamp(r.DataTime, tz),
         Steps = r.Steps,
         DistanceMetres = r.DistanceMetres,
         CaloriesKcal = r.CaloriesKcal,

@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -16,20 +15,23 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/fleet/alarms/latest   — most recent alarm event per device
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetAlarmController : ControllerBase
 {
     private readonly IAlarmQueryService _alarmService;
     private readonly ILogger<FleetAlarmController> _logger;
+    private readonly IDateTimeService _dt;
 
     public FleetAlarmController(
         IAlarmQueryService alarmService,
-        ILogger<FleetAlarmController> logger)
+        ILogger<FleetAlarmController> logger,
+        IDateTimeService dt)
     {
         _alarmService = alarmService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>Returns all alarm events across all devices on the given date.</summary>
@@ -41,7 +43,7 @@ public sealed class FleetAlarmController : ControllerBase
     {
         _logger.LogInformation("GetFleetAlarms — entry, date: {Date}", date);
 
-        if (!DateTimeUtilities.IsValidDate(date))
+        if (!_dt.IsValidDate(date))
         {
             _logger.LogWarning("GetFleetAlarms — invalid date: {Date}", date);
             return BadRequest(new ApiListResponse<AlarmEventDto> { ReturnCode = 400 });

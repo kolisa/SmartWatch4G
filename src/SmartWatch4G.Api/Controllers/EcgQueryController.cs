@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -14,20 +13,23 @@ namespace SmartWatch4G.Api.Controllers;
 /// Route: GET /api/devices/{deviceId}/ecg?date=
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/devices/{deviceId}/ecg")]
 public sealed class EcgQueryController : ControllerBase
 {
     private readonly IEcgQueryService _ecgService;
     private readonly ILogger<EcgQueryController> _logger;
+    private readonly IDateTimeService _dt;
 
     public EcgQueryController(
         IEcgQueryService ecgService,
-        ILogger<EcgQueryController> logger)
+        ILogger<EcgQueryController> logger,
+        IDateTimeService dt)
     {
         _ecgService = ecgService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>Returns ECG waveform records for the given device and date.</summary>
@@ -41,7 +43,7 @@ public sealed class EcgQueryController : ControllerBase
         _logger.LogInformation(
             "GetEcg — entry, device: {DeviceId}, date: {Date}", deviceId, date);
 
-        if (string.IsNullOrWhiteSpace(deviceId) || !DateTimeUtilities.IsValidDate(date))
+        if (string.IsNullOrWhiteSpace(deviceId) || !_dt.IsValidDate(date))
         {
             _logger.LogWarning(
                 "GetEcg — invalid parameters, device: {DeviceId}, date: {Date}", deviceId, date);

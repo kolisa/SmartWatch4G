@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
-using SmartWatch4G.Application.Utilities;
 
 namespace SmartWatch4G.Api.Controllers;
 
@@ -17,20 +16,23 @@ namespace SmartWatch4G.Api.Controllers;
 ///   GET /api/fleet/location/recent?minutes=— all devices' locations in the last N minutes
 /// </summary>
 [ApiVersion("1.0")]
-[EnableRateLimiting("app-read")]
+[EnableRateLimiting("dashboard-api")]
 [ApiController]
 [Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetLocationController : ControllerBase
 {
     private readonly ILocationQueryService _locationService;
     private readonly ILogger<FleetLocationController> _logger;
+    private readonly IDateTimeService _dt;
 
     public FleetLocationController(
         ILocationQueryService locationService,
-        ILogger<FleetLocationController> logger)
+        ILogger<FleetLocationController> logger,
+        IDateTimeService dt)
     {
         _locationService = locationService;
         _logger = logger;
+        _dt = dt;
     }
 
     /// <summary>Returns the most recent GPS point for every device. Useful for a live fleet map.</summary>
@@ -63,7 +65,7 @@ public sealed class FleetLocationController : ControllerBase
     {
         _logger.LogInformation("GetFleetLocation — entry, date: {Date}", date);
 
-        if (!DateTimeUtilities.IsValidDate(date))
+        if (!_dt.IsValidDate(date))
         {
             _logger.LogWarning("GetFleetLocation — invalid date: {Date}", date);
             return BadRequest(new ApiListResponse<LocationPointDto> { ReturnCode = 400 });

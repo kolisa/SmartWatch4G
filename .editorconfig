@@ -1,0 +1,47 @@
+#
+# WARNING: DO NOT MODIFY THIS FILE!
+#
+# This file should be kept identical to "/.editorconfig" in FeaturePeer.Template.
+# Customizations on a per peer basis are not recommended,
+# but if needed can be made in the "server/.editorconfig" file.
+#
+
+root = true
+
+# All Files
+[*]
+
+#### Core EditorConfig Options ####
+
+# Indentation and spacing
+indent_size = 4
+indent_style = space
+tab_width = 4
+
+# New line preferences
+end_of_line = crlf
+insert_final_newline = false
+
+# Yaml files, whitespace sensitive so leave the indent as 2
+[*.{yml,yaml,manifest}]
+
+#### Core EditorConfig Options ####
+
+# Indentation and spacing
+indent_size = 2
+indent_style = space
+tab_width = 2
+
+# C# files
+[*.cs]
+
+#### Core EditorConfig Options ####
+
+# Indentation and spacing
+indent_size = 4
+indent_style = space
+tab_width = 4
+
+# New line preferences
+end_of_line = crlf
+insert_final_newline = false

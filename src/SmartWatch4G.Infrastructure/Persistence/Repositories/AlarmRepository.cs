@@ -1,3 +1,5 @@
+using Dapper;
+
 using Microsoft.EntityFrameworkCore;
 
 using SmartWatch4G.Application.Utilities;
@@ -12,10 +14,10 @@ internal sealed class AlarmRepository : IAlarmRepository
 
     public AlarmRepository(AppDbContext db) => _db = db;
 
-    public async Task AddRangeAsync(IEnumerable<AlarmEventRecord> records, CancellationToken cancellationToken = default)
+    public Task AddRangeAsync(IEnumerable<AlarmEventRecord> records, CancellationToken cancellationToken = default)
     {
         _db.AlarmEventRecords.AddRange(records);
-        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<AlarmEventRecord>> GetByDeviceAndDateAsync(
@@ -70,19 +72,17 @@ internal sealed class AlarmRepository : IAlarmRepository
     public async Task<IReadOnlyList<AlarmEventRecord>> GetLatestAllDevicesAsync(
         CancellationToken cancellationToken = default)
     {
-        var latestPerDevice = _db.AlarmEventRecords
-            .GroupBy(r => r.DeviceId)
-            .Select(g => new { DeviceId = g.Key, MaxReceivedAt = g.Max(r => r.ReceivedAt) });
-
-        return await _db.AlarmEventRecords
-            .AsNoTracking()
-            .Join(latestPerDevice,
-                  r => new { r.DeviceId, r.ReceivedAt },
-                  l => new { l.DeviceId, ReceivedAt = l.MaxReceivedAt },
-                  (r, _) => r)
-            .OrderBy(r => r.DeviceId)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        using var conn = new Microsoft.Data.SqlClient.SqlConnection(
+            _db.Database.GetConnectionString());
+        return (await conn.QueryAsync<AlarmEventRecord>("""
+            SELECT *
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY DeviceId ORDER BY ReceivedAt DESC) AS _rn
+                FROM   AlarmEventRecords
+            ) t
+            WHERE t._rn = 1
+            ORDER BY DeviceId
+            """)).AsList();
     }
 
     public async Task<IReadOnlyList<AlarmEventRecord>> GetAllDevicesAndDateAsync(
