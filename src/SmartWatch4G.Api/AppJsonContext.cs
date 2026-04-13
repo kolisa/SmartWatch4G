@@ -20,6 +20,7 @@ namespace SmartWatch4G.Api;
 [JsonSerializable(typeof(ApiListResponse<EcgRecordDto>))]
 [JsonSerializable(typeof(ApiListResponse<RriReadingDto>))]
 [JsonSerializable(typeof(ApiListResponse<LocationPointDto>))]
+[JsonSerializable(typeof(ApiItemResponse<LocationPointDto>))]
 [JsonSerializable(typeof(ApiListResponse<AccelerometerReadingDto>))]
 [JsonSerializable(typeof(ApiListResponse<AlarmEventDto>))]
 [JsonSerializable(typeof(ApiListResponse<CallLogItemDto>))]

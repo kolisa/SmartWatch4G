@@ -96,10 +96,13 @@ public abstract class PacketParserBase : ControllerBase
             }
             catch (Exception ex)
             {
+                // Log and continue — the device expects 0x00 for the overall upload
+                // as long as the packet structure was valid. Aborting mid-loop would
+                // cause the device to retry the entire upload, creating duplicates for
+                // already-processed frames.
                 Logger.LogError(ex,
-                    "OnPacketAsync failed — device {DeviceId}, opcode 0x{Opcode:X4}",
+                    "OnPacketAsync failed — device {DeviceId}, opcode 0x{Opcode:X4} (packet skipped)",
                     deviceId, opcode);
-                return BinaryResponse(0x01);
             }
 
             pos += FrameHeaderLength + payloadLen;
@@ -115,7 +118,9 @@ public abstract class PacketParserBase : ControllerBase
         byte[] payload,
         CancellationToken ct);
 
-    /// <summary>Returns a raw 1-byte binary response as per the device protocol.</summary>
+    /// <summary>Returns a raw 1-byte binary response as per the device protocol.
+    /// Content-Type must be "text/plain" — matches the iwown reference C# sample
+    /// and is what the device firmware and the iwown test tool (search.iwown.com/connect4g) expect.</summary>
     protected IActionResult BinaryResponse(byte code)
         => File(new byte[] { code }, "text/plain");
 
