@@ -12,7 +12,7 @@
 
   <!-- Reuse the already-generated protobuf files from the Infrastructure project -->
   <ItemGroup>
-    <Compile Include="..\SmartWatch4G.Infrastructure\Protobuf\*.cs" />
+    <Compile Include="..\..\..\src\SmartWatch4G.Infrastructure\Protobuf\*.cs" />
   </ItemGroup>
 
 </Project>

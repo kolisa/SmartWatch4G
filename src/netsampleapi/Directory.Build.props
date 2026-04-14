@@ -1,6 +1,6 @@
 <Project>
   <!-- Import the root Directory.Build.props so shared settings (TargetFramework etc.) are inherited -->
-  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../../'))" />
 
   <!-- Override root settings — reference sample uses older style that triggers code-style warnings -->
   <PropertyGroup>
