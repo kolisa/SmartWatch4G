@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+
+  <!-- Reuse the already-generated protobuf files from the Infrastructure project -->
+  <ItemGroup>
+    <Compile Include="..\SmartWatch4G.Infrastructure\Protobuf\*.cs" />
+  </ItemGroup>
+
+</Project>
