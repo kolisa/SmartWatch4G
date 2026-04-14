@@ -73,6 +73,14 @@ public sealed class DeviceStatusController : ControllerBase
             return Ok(new ResponseCodeDto { ReturnCode = 10002 });
         }
 
+        if (string.IsNullOrWhiteSpace(dto.Status))
+        {
+            _logger.LogWarning(
+                "NotifyDeviceStatus — Status is empty for device {DeviceId}, rejecting",
+                dto.DeviceId);
+            return Ok(new ResponseCodeDto { ReturnCode = 10002 });
+        }
+
         try
         {
             await _statusRepo.AddAsync(new DeviceStatusRecord
