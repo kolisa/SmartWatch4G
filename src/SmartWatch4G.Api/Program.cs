@@ -185,7 +185,8 @@ try
     });
     app.UseMiddleware<SmartWatch4G.Api.Middleware.GlobalExceptionMiddleware>();
     app.UseRateLimiter();
-    app.UseHttpsRedirection();
+    // UseHttpsRedirection removed: IoT device firmware does not follow HTTP 301 redirects.
+    // IIS handles TLS termination externally; the app receives plain HTTP from IIS in-process.
     app.MapHealthChecks("/health");
     app.MapControllers();
 
