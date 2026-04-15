@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using SampleApi.Parser;
+using SampleApi.Storage;
 
 namespace SampleApi.Controller {
     [Route("alarm/upload")]
@@ -11,10 +12,12 @@ namespace SampleApi.Controller {
     public class AlarmController : ControllerBase {
         private readonly ILogger<AlarmController> logger;
         private readonly AlarmProcessor alarmParser;
+        private readonly RawDataFileStore rawDataStore;
 
-        public AlarmController(ILogger<AlarmController> thelogger,AlarmProcessor thealarmParser){
+        public AlarmController(ILogger<AlarmController> thelogger, AlarmProcessor thealarmParser, RawDataFileStore theRawDataStore){
             logger = thelogger;
             alarmParser = thealarmParser;
+            rawDataStore = theRawDataStore;
         }
 
         [HttpPost]
@@ -47,6 +50,9 @@ namespace SampleApi.Controller {
             Array.Copy(payload, 0, deviceBytes, 0, 15);
             string device = Encoding.UTF8.GetString(deviceBytes);
             logger.LogInformation("Device: {Device}", device);
+
+            // Persist the raw binary frame so it can be processed and saved to the database later
+            await rawDataStore.SaveAsync(device, "alarm", payload);
 
             int startPos = 15;
             while (true){

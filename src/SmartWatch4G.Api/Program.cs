@@ -151,9 +151,16 @@ try
     // ── Auto-migrate on startup (Development only; Production uses CI/CD pipeline migrations) ──
     if (app.Environment.IsDevelopment())
     {
-        using IServiceScope scope = app.Services.CreateScope();
-        AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.MigrateAsync();
+        try
+        {
+            using IServiceScope scope = app.Services.CreateScope();
+            AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Database migration failed on startup — the app will continue without applying migrations");
+        }
     }
 
     // ── Swagger (all environments) ────────────────────────────────────────────

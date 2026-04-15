@@ -1,5 +1,6 @@
 using SampleApi.Calculation;
 using SampleApi.Parser;
+using SampleApi.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,9 +21,12 @@ builder.Services.AddSingleton<AfPreprocessor>();
 builder.Services.AddSingleton<EcgPreprocessor>();
 builder.Services.AddSingleton<SleepPreprocessor>();
 
+builder.Services.AddSingleton<RawDataFileStore>();
+
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
-builder.Logging.AddProvider(new MyFileLoggerProvider("logs/myapi.log"));
+builder.Logging.AddProvider(new MyFileLoggerProvider(
+    Path.Combine(builder.Environment.ContentRootPath, "logs", "myapi.log")));
 
 var app = builder.Build();
 

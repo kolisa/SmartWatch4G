@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using SampleApi.Parser;
 using SampleApi.Calculation;
+using SampleApi.Storage;
 
 namespace SampleApi.Controller {
     [Route("pb/upload")]
@@ -16,6 +17,7 @@ namespace SampleApi.Controller {
         private readonly AfPreprocessor af_preprocessor;
         private readonly EcgPreprocessor ecg_preprocessor;
         private readonly SleepPreprocessor sleep_preprocessor;
+        private readonly RawDataFileStore rawDataStore;
 
 
         public DataController(ILogger<DataController> thelogger, 
@@ -23,13 +25,15 @@ namespace SampleApi.Controller {
             OldManProcessor theOldmanParser,
             AfPreprocessor theAfPreprocessor,
             EcgPreprocessor theEcgPreprocessor,
-            SleepPreprocessor theSleepPreprocessor){
+            SleepPreprocessor theSleepPreprocessor,
+            RawDataFileStore theRawDataStore){
             logger = thelogger;
             historyDataParser = theHistoryParser;
             oldmanParser = theOldmanParser;
             af_preprocessor = theAfPreprocessor;
             ecg_preprocessor = theEcgPreprocessor;
             sleep_preprocessor = theSleepPreprocessor;
+            rawDataStore = theRawDataStore;
         }
 
         [HttpPost]
@@ -62,6 +66,9 @@ namespace SampleApi.Controller {
             Array.Copy(payload, 0, deviceBytes, 0, 15);
             string device = Encoding.UTF8.GetString(deviceBytes);
             logger.LogInformation("Device: {Device}", device);
+
+            // Persist the raw binary frame so it can be processed and saved to the database later
+            await rawDataStore.SaveAsync(device, "pb", payload);
 
             int startPos = 15;
             while (true){
