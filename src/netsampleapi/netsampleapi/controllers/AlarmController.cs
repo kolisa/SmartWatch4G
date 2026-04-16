@@ -52,7 +52,14 @@ namespace SampleApi.Controller {
             logger.LogInformation("Device: {Device}", device);
 
             // Persist the raw binary frame so it can be processed and saved to the database later
-            await rawDataStore.SaveAsync(device, "alarm", payload);
+            try{
+                await rawDataStore.SaveAsync(device, "alarm", payload);
+                logger.LogInformation("[alarm/upload] Raw payload saved for device {Device} ({Bytes} bytes)", device.Trim(), payload.Length);
+            }
+            catch (Exception ex){
+                // Log the failure but do NOT return an error — the device must still get 0x00
+                logger.LogError(ex, "[alarm/upload] Failed to save raw payload for device {Device}", device.Trim());
+            }
 
             int startPos = 15;
             while (true){
