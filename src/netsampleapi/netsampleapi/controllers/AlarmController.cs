@@ -34,7 +34,7 @@ namespace SampleApi.Controller {
             }
             
             if (payload.Length < 23){
-                logger.LogWarning("Data length below 23");
+                logger.LogWarning("[alarm/upload] Payload too short: received {Bytes} bytes, minimum is 23", payload.Length);
                 return File(new byte[] { 0x02 }, "text/plain");
             }
 
