@@ -26,7 +26,7 @@ builder.Services.AddSingleton<RawDataFileStore>();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddProvider(new MyFileLoggerProvider(
-    Path.Combine(builder.Environment.ContentRootPath, "logs", "myapi.log")));
+    Path.Combine(builder.Environment.ContentRootPath, "logs", "smartWatchdata.log")));
 
 var app = builder.Build();
 
