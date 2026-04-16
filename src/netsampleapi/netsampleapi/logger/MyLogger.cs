@@ -10,13 +10,16 @@ public class MyFileLogger : ILogger
     public MyFileLogger(string filePath)
     {
         _filePath = filePath;
+        // Ensure the logs directory exists before any write is attempted
+        string? directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
     }
 
-    public IDisposable BeginScope<TState>(TState state) => null;
+    public IDisposable BeginScope<TState>(TState state) => NullScope.Instance;
 
     public bool IsEnabled(LogLevel logLevel)
     {
-        // Define the minimum log level to be written to the file
         return logLevel >= LogLevel.Information;
     }
 
@@ -46,5 +49,11 @@ public class MyFileLogger : ILogger
         {
             _semaphoreSlim.Release();
         }
+    }
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new NullScope();
+        public void Dispose() { }
     }
 }
