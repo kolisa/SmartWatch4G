@@ -23,9 +23,10 @@ namespace SampleApi.Controller {
         public async Task<IActionResult> UploadDeviceInfo(){
             ResponseCode response;
             DeviceInfo requestData = new DeviceInfo();
+            string bodyData = string.Empty;
             try{
                 using var reader = new StreamReader(Request.Body);
-                var bodyData = await reader.ReadToEndAsync();
+                bodyData = await reader.ReadToEndAsync();
                 logger.LogInformation("UploadDeviceInfo: {BodyData}", bodyData);
 
                 requestData = JsonSerializer.Deserialize<DeviceInfo>(bodyData ?? string.Empty);
@@ -33,14 +34,20 @@ namespace SampleApi.Controller {
                     response = new ResponseCode { ReturnCode = 10002 };
                     return Ok(response);
                 }
-
-                // Persist the raw JSON so it can be saved to the database later
-                await rawDataStore.SaveAsync(requestData.DeviceId ?? "unknown", "deviceinfo", Encoding.UTF8.GetBytes(bodyData));
             }
             catch (Exception ex){
                 logger.LogError("Error reading or deserializing request: {Message}", ex.Message);
                 response = new ResponseCode { ReturnCode = 10002 };
                 return Ok(response);
+            }
+
+            // Persist the raw JSON so it can be saved to the database later
+            try{
+                await rawDataStore.SaveAsync(requestData.DeviceId ?? "unknown", "deviceinfo", Encoding.UTF8.GetBytes(bodyData!));
+                logger.LogInformation("[deviceinfo/upload] Raw payload saved for device {DeviceId}", requestData.DeviceId);
+            }
+            catch (Exception ex){
+                logger.LogError(ex, "[deviceinfo/upload] Failed to save raw payload for device {DeviceId}", requestData.DeviceId);
             }
 
             response = new ResponseCode { ReturnCode = 0 };

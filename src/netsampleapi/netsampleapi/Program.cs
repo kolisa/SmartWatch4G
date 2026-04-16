@@ -1,4 +1,5 @@
 using SampleApi.Calculation;
+using SampleApi.Middleware;
 using SampleApi.Parser;
 using SampleApi.Storage;
 
@@ -31,6 +32,8 @@ builder.Logging.AddProvider(new MyFileLoggerProvider(
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 app.UseSwagger();
 app.UseSwaggerUI();
 

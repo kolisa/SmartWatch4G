@@ -68,7 +68,14 @@ namespace SampleApi.Controller {
             logger.LogInformation("Device: {Device}", device);
 
             // Persist the raw binary frame so it can be processed and saved to the database later
-            await rawDataStore.SaveAsync(device, "pb", payload);
+            try{
+                await rawDataStore.SaveAsync(device, "pb", payload);
+                logger.LogInformation("[pb/upload] Raw payload saved for device {Device} ({Bytes} bytes)", device.Trim(), payload.Length);
+            }
+            catch (Exception ex){
+                // Log the failure but do NOT return an error — the device must still get 0x00
+                logger.LogError(ex, "[pb/upload] Failed to save raw payload for device {Device}", device.Trim());
+            }
 
             int startPos = 15;
             while (true){
