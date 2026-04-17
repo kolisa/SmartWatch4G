@@ -4,16 +4,23 @@ using System.IO;
 
 public class MyFileLogger : ILogger
 {
-    private readonly string _filePath;
+    private readonly string _directory;
+    private readonly string _baseFileName;
+    private readonly string _extension;
     private readonly SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
     public MyFileLogger(string filePath)
     {
-        _filePath = filePath;
-        // Ensure the logs directory exists before any write is attempted
-        string? directory = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(directory))
-            Directory.CreateDirectory(directory);
+        _directory = Path.GetDirectoryName(filePath) ?? ".";
+        _baseFileName = Path.GetFileNameWithoutExtension(filePath);
+        _extension = Path.GetExtension(filePath);
+        Directory.CreateDirectory(_directory);
+    }
+
+    private string GetDailyFilePath()
+    {
+        var date = DateTime.Now.ToString("yyyy-MM-dd");
+        return Path.Combine(_directory, $"{_baseFileName}_{date}{_extension}");
     }
 
     public IDisposable BeginScope<TState>(TState state) => NullScope.Instance;
@@ -40,7 +47,7 @@ public class MyFileLogger : ILogger
         await _semaphoreSlim.WaitAsync();
         try
         {
-            using (var writer = new StreamWriter(_filePath, true))
+            using (var writer = new StreamWriter(GetDailyFilePath(), true))
             {
                 await writer.WriteLineAsync(message);
             }
