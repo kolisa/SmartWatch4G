@@ -19,7 +19,7 @@ public class MyFileLogger : ILogger
 
     private string GetDailyFilePath()
     {
-        var date = DateTime.Now.ToString("yyyy-MM-dd");
+        var date = System.DateTime.Now.ToString("yyyy-MM-dd");
         return Path.Combine(_directory, $"{_baseFileName}_{date}{_extension}");
     }
 
