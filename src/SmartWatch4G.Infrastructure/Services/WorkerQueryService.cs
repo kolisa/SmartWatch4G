@@ -20,7 +20,7 @@ public sealed class WorkerQueryService : IWorkerQueryService
         _logger      = logger;
     }
 
-    public async Task<ServiceResult<PagedResult<WorkerSummaryResponse>>> GetPagedWorkersAsync(int page, int pageSize)
+    public async Task<ServiceResult<PagedResult<WorkerSummaryResponse>>> GetPagedWorkersAsync(int page, int pageSize, int? companyId = null)
     {
         if (page < 1)    page     = 1;
         if (pageSize < 1) pageSize = 10;
@@ -28,9 +28,20 @@ public sealed class WorkerQueryService : IWorkerQueryService
 
         try
         {
-            var total   = _db.GetActiveWorkerCount();
             var skip    = (page - 1) * pageSize;
-            var workers = _db.GetPagedUserProfiles(skip, pageSize);
+            int total;
+            IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> workers;
+
+            if (companyId.HasValue)
+            {
+                total   = _db.GetActiveWorkerCountByCompany(companyId.Value);
+                workers = _db.GetPagedUserProfilesByCompany(skip, pageSize, companyId.Value);
+            }
+            else
+            {
+                total   = _db.GetActiveWorkerCount();
+                workers = _db.GetPagedUserProfiles(skip, pageSize);
+            }
 
             // Parallel fetch of latest health + GPS for each worker on this page
             var tasks = workers.Select(async w =>

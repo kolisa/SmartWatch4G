@@ -76,7 +76,11 @@ public interface IDatabaseService
 
     int GetActiveWorkerCount();
 
+    int GetActiveWorkerCountByCompany(int companyId);
+
     IReadOnlyList<UserProfile> GetPagedUserProfiles(int skip, int take);
+
+    IReadOnlyList<UserProfile> GetPagedUserProfilesByCompany(int skip, int take, int companyId);
 
     int GetRecentAlarmCount(int withinHours);
 
@@ -89,4 +93,6 @@ public interface IDatabaseService
     /// in a single round trip — avoids three separate COUNT queries for the dashboard.
     /// </summary>
     (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours);
+
+    (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCountsByCompany(int withinHours, int companyId);
 }

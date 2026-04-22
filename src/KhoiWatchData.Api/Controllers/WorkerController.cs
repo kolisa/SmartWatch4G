@@ -20,12 +20,14 @@ public sealed class WorkerController : ControllerBase
     /// </summary>
     /// <param name="page">Page number, 1-based (default: 1).</param>
     /// <param name="pageSize">Items per page, max 100 (default: 10).</param>
+    /// <param name="companyId">Optional. Filter workers belonging to this company.</param>
     [HttpGet]
     public async Task<IActionResult> GetWorkers(
-        [FromQuery] int page     = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int  page      = 1,
+        [FromQuery] int  pageSize  = 10,
+        [FromQuery] int? companyId = null)
     {
-        var result = await _workerService.GetPagedWorkersAsync(page, pageSize);
+        var result = await _workerService.GetPagedWorkersAsync(page, pageSize, companyId);
         if (result.IsFailure)
             return StatusCode(500, new { message = result.Error });
 

@@ -19,11 +19,13 @@ public sealed class DashboardService : IDashboardService
         _logger = logger;
     }
 
-    public Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync()
+    public Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync(int? companyId = null)
     {
         try
         {
-            var (workers, alarms, sos) = _db.GetDashboardCounts(AlertWindowHours);
+            var (workers, alarms, sos) = companyId.HasValue
+                ? _db.GetDashboardCountsByCompany(AlertWindowHours, companyId.Value)
+                : _db.GetDashboardCounts(AlertWindowHours);
 
             return Task.FromResult(ServiceResult<DashboardSummaryResponse>.Ok(new DashboardSummaryResponse
             {

@@ -5,6 +5,6 @@ namespace SmartWatch4G.Application.Interfaces;
 
 public interface IWorkerQueryService
 {
-    Task<ServiceResult<PagedResult<WorkerSummaryResponse>>> GetPagedWorkersAsync(int page, int pageSize);
+    Task<ServiceResult<PagedResult<WorkerSummaryResponse>>> GetPagedWorkersAsync(int page, int pageSize, int? companyId = null);
     Task<ServiceResult<WorkerDetailResponse>> GetWorkerDetailAsync(string deviceId);
 }

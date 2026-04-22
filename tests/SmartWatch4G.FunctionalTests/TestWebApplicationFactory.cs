@@ -77,10 +77,13 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         // Health / stats query methods
         public SmartWatch4G.Domain.Entities.HealthSnapshot? GetLatestHealthSnapshot(string deviceId) => null;
         public int GetActiveWorkerCount() => 0;
+        public int GetActiveWorkerCountByCompany(int companyId) => 0;
         public IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> GetPagedUserProfiles(int skip, int take) => [];
+        public IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> GetPagedUserProfilesByCompany(int skip, int take, int companyId) => [];
         public int GetRecentAlarmCount(int withinHours) => 0;
         public int GetRecentSosCount(int withinHours) => 0;
         public IReadOnlyList<SmartWatch4G.Domain.Entities.AlarmEvent> GetRecentAlarms(int withinHours, int limit) => [];
         public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours) => (0, 0, 0);
+        public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCountsByCompany(int withinHours, int companyId) => (0, 0, 0);
     }
 }

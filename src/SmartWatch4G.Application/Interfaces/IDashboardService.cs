@@ -5,5 +5,5 @@ namespace SmartWatch4G.Application.Interfaces;
 
 public interface IDashboardService
 {
-    Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync();
+    Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync(int? companyId = null);
 }

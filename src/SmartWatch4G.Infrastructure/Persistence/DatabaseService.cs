@@ -1299,6 +1299,44 @@ END
         return list;
     }
 
+    public int GetActiveWorkerCountByCompany(int companyId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(
+                "SELECT COUNT(*) FROM user_profiles WHERE is_active=1 AND company_id=@cid", conn);
+            cmd.Parameters.AddWithValue("@cid", companyId);
+            return (int)cmd.ExecuteScalar()!;
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetActiveWorkerCountByCompany failed for {Id}", companyId); return 0; }
+    }
+
+    public IReadOnlyList<UserProfile> GetPagedUserProfilesByCompany(int skip, int take, int companyId)
+    {
+        var list = new List<UserProfile>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
+                       u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
+                FROM user_profiles u
+                LEFT JOIN companies c ON c.id = u.company_id
+                WHERE u.is_active = 1 AND u.company_id = @cid
+                ORDER BY u.surname, u.name
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+            cmd.Parameters.AddWithValue("@cid",  companyId);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(MapUserProfile(r));
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetPagedUserProfilesByCompany failed for {Id}", companyId); }
+        return list;
+    }
+
     public int GetRecentAlarmCount(int withinHours)
     {
         try
@@ -1385,6 +1423,29 @@ END
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetDashboardCounts failed.");
+            return (0, 0, 0);
+        }
+    }
+
+    public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCountsByCompany(int withinHours, int companyId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT
+                    (SELECT COUNT(*) FROM user_profiles WHERE is_active=1 AND company_id=@cid),
+                    (SELECT COUNT(*) FROM alarms       WHERE company_id=@cid AND created_at >= DATEADD(HOUR, -@h, GETDATE())),
+                    (SELECT COUNT(*) FROM sos_events   WHERE company_id=@cid AND created_at >= DATEADD(HOUR, -@h, GETDATE()))", conn);
+            cmd.Parameters.AddWithValue("@h",   withinHours);
+            cmd.Parameters.AddWithValue("@cid", companyId);
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return (0, 0, 0);
+            return (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetDashboardCountsByCompany failed for {Id}", companyId);
             return (0, 0, 0);
         }
     }
