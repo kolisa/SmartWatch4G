@@ -99,4 +99,22 @@ public sealed class UserController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>Links or unlinks a user to a company. Set companyId to null to remove the association.</summary>
+    [HttpPut("{deviceId}/company")]
+    public async Task<IActionResult> LinkToCompany(string deviceId, [FromBody] LinkUserToCompanyRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+            return BadRequest(new { message = "Device ID is required." });
+
+        var result = await _userService.LinkToCompanyAsync(deviceId, request.CompanyId);
+        if (result.IsFailure)
+            return result.ErrorCode switch
+            {
+                404 => NotFound(new { message = result.Error }),
+                _   => StatusCode(500, new { message = result.Error })
+            };
+
+        return Ok(result.Value);
+    }
 }

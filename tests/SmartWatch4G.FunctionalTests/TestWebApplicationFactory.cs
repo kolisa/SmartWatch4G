@@ -52,10 +52,19 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
 
         // User profile methods
         public void UpsertUserProfile(string deviceId, string name, string surname,
-            string? email=null, string? cell=null, string? empNo=null, string? address=null) { }
+            string? email=null, string? cell=null, string? empNo=null, string? address=null,
+            int? companyId=null) { }
         public SmartWatch4G.Domain.Entities.UserProfile? GetUserProfile(string deviceId) => null;
         public IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> GetAllUserProfiles() => [];
         public void DeleteUserProfile(string deviceId) { }
+
+        // Company methods
+        public int CreateCompany(string name, string? reg, string? email, string? phone, string? addr) => -1;
+        public SmartWatch4G.Domain.Entities.Company? GetCompany(int id) => null;
+        public IReadOnlyList<SmartWatch4G.Domain.Entities.Company> GetAllCompanies() => [];
+        public void UpdateCompany(int id, string name, string? reg, string? email, string? phone, string? addr) { }
+        public void DeleteCompany(int id) { }
+        public void LinkUserToCompany(string deviceId, int? companyId) { }
 
         // GNSS query methods
         public SmartWatch4G.Domain.Entities.GnssTrack? GetLatestGnssTrack(string deviceId) => null;

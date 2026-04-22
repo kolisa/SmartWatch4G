@@ -23,6 +23,7 @@ public static class InfrastructureServiceExtensions
 
         // ── Application services ──────────────────────────────────────────────
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ICompanyService, CompanyService>();
         services.AddScoped<ITrackingQueryService, TrackingQueryService>();
         services.AddScoped<IWorkerQueryService, WorkerQueryService>();
         services.AddScoped<IDashboardService, DashboardService>();

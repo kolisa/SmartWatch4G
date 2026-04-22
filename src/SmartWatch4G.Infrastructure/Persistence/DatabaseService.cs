@@ -70,6 +70,8 @@ CREATE TABLE gps_tracks (
     longitude   FLOAT         NOT NULL,
     latitude    FLOAT         NOT NULL,
     loc_type    NVARCHAR(30)  NULL,
+    user_id     INT           NULL,
+    company_id  INT           NULL,
     created_at  DATETIME2     DEFAULT GETDATE(),
     CONSTRAINT uq_gps UNIQUE (device_id, gnss_time, longitude, latitude)
 );
@@ -91,6 +93,8 @@ CREATE TABLE health_snapshots (
     sbp         INT           NULL,
     dbp         INT           NULL,
     fatigue     INT           NULL,
+    user_id     INT           NULL,
+    company_id  INT           NULL,
     created_at  DATETIME2     DEFAULT GETDATE(),
     CONSTRAINT uq_health UNIQUE (device_id, record_time)
 );
@@ -102,6 +106,8 @@ CREATE TABLE alarms (
     alarm_time  NVARCHAR(30)  NOT NULL,
     alarm_type  NVARCHAR(30)  NOT NULL,
     details     NVARCHAR(200) NULL,
+    user_id     INT           NULL,
+    company_id  INT           NULL,
     created_at  DATETIME2     DEFAULT GETDATE(),
     CONSTRAINT uq_alarm UNIQUE (device_id, alarm_time, alarm_type)
 );
@@ -117,6 +123,8 @@ CREATE TABLE sos_events (
     call_status  INT           NULL,
     call_start   NVARCHAR(30)  NULL,
     call_end     NVARCHAR(30)  NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
     created_at   DATETIME2     DEFAULT GETDATE(),
     CONSTRAINT uq_sos UNIQUE (device_id, alarm_time)
 );
@@ -131,6 +139,8 @@ CREATE TABLE device_info_log (
     wearing_status NVARCHAR(10)   NULL,
     signal         NVARCHAR(50)   NULL,
     raw_json       NVARCHAR(MAX)  NULL,
+    user_id        INT            NULL,
+    company_id     INT            NULL,
     created_at     DATETIME2      DEFAULT GETDATE()
 );
 
@@ -145,6 +155,8 @@ CREATE TABLE device_user_info (
     calibrate_run  INT          NULL,
     wrist_circle   INT          NULL,
     hypertension   INT          NULL,
+    user_id        INT          NULL,
+    company_id     INT          NULL,
     updated_at     DATETIME2    DEFAULT GETDATE()
 );
 
@@ -153,6 +165,8 @@ CREATE TABLE device_fall_settings (
     device_id       NVARCHAR(50) PRIMARY KEY,
     fall_check      BIT          NULL,
     fall_threshold  INT          NULL,
+    user_id         INT          NULL,
+    company_id      INT          NULL,
     updated_at      DATETIME2    DEFAULT GETDATE()
 );
 
@@ -162,6 +176,8 @@ CREATE TABLE device_data_freq (
     gps_auto_check     BIT          NULL,
     gps_interval_time  INT          NULL,
     power_mode         INT          NULL,
+    user_id            INT          NULL,
+    company_id         INT          NULL,
     updated_at         DATETIME2    DEFAULT GETDATE()
 );
 
@@ -173,6 +189,8 @@ CREATE TABLE device_locate_freq (
     auto_locate          BIT          NULL,
     locate_interval_time INT          NULL,
     power_mode           INT          NULL,
+    user_id              INT          NULL,
+    company_id           INT          NULL,
     updated_at           DATETIME2    DEFAULT GETDATE()
 );
 
@@ -182,6 +200,8 @@ CREATE TABLE device_lcd_gesture (
     open       BIT          NULL,
     start_hour INT          NULL,
     end_hour   INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -193,6 +213,8 @@ CREATE TABLE device_hr_alarm (
     low           INT          NULL,
     threshold     INT          NULL,
     alarm_interval INT         NULL,
+    user_id        INT         NULL,
+    company_id     INT         NULL,
     updated_at    DATETIME2    DEFAULT GETDATE()
 );
 
@@ -204,6 +226,8 @@ CREATE TABLE device_dynamic_hr_alarm (
     low        INT          NULL,
     timeout    INT          NULL,
     interval   INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -212,6 +236,8 @@ CREATE TABLE device_spo2_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
     open       BIT          NULL,
     low        INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -223,6 +249,8 @@ CREATE TABLE device_bp_alarm (
     sbp_below  INT          NULL,
     dbp_high   INT          NULL,
     dbp_below  INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -232,6 +260,8 @@ CREATE TABLE device_temp_alarm (
     open       BIT          NULL,
     high       INT          NULL,
     low        INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -242,6 +272,8 @@ CREATE TABLE device_auto_af (
     interval        INT          NULL,
     rri_single_time BIT          NULL,
     rri_type        INT          NULL,
+    user_id         INT          NULL,
+    company_id      INT          NULL,
     updated_at      DATETIME2    DEFAULT GETDATE()
 );
 
@@ -251,6 +283,8 @@ CREATE TABLE device_goal (
     step       INT          NULL,
     distance   INT          NULL,
     calorie    INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -263,6 +297,8 @@ CREATE TABLE device_display (
     distance_unit    INT          NULL,
     temperature_unit INT          NULL,
     wear_hand_right  BIT          NULL,
+    user_id          INT          NULL,
+    company_id       INT          NULL,
     updated_at       DATETIME2    DEFAULT GETDATE()
 );
 
@@ -273,6 +309,8 @@ CREATE TABLE device_bp_adjust (
     dbp_band   INT          NULL,
     sbp_meter  INT          NULL,
     dbp_meter  INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -280,6 +318,8 @@ IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_hr_interval')
 CREATE TABLE device_hr_interval (
     device_id  NVARCHAR(50) PRIMARY KEY,
     interval   INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -287,6 +327,8 @@ IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_other_interval')
 CREATE TABLE device_other_interval (
     device_id  NVARCHAR(50) PRIMARY KEY,
     interval   INT          NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     updated_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -296,6 +338,8 @@ CREATE TABLE device_gps_settings (
     gps_auto_check    BIT          NULL,
     gps_interval_time INT          NULL,
     run_gps           BIT          NULL,
+    user_id           INT          NULL,
+    company_id        INT          NULL,
     updated_at        DATETIME2    DEFAULT GETDATE()
 );
 
@@ -306,6 +350,8 @@ CREATE TABLE device_phonebook (
     name       NVARCHAR(100) NOT NULL,
     number     NVARCHAR(30)  NOT NULL,
     sos        BIT           NOT NULL DEFAULT 0,
+    user_id    INT           NULL,
+    company_id INT           NULL,
     created_at DATETIME2     DEFAULT GETDATE()
 );
 
@@ -343,6 +389,8 @@ CREATE TABLE device_sedentary (
     end_hour   INT          NOT NULL,
     duration   INT          NOT NULL,
     threshold  INT          NOT NULL DEFAULT 40,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     created_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -360,6 +408,8 @@ CREATE TABLE sleep_calculations (
     resp_max     FLOAT         NULL,
     resp_min     FLOAT         NULL,
     sections     NVARCHAR(MAX) NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
     created_at   DATETIME2     DEFAULT GETDATE()
 );
 
@@ -371,6 +421,8 @@ CREATE TABLE ecg_calculations (
     hr         INT          NOT NULL,
     effective  INT          NOT NULL,
     direction  INT          NOT NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     created_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -379,6 +431,8 @@ CREATE TABLE af_calculations (
     id         INT IDENTITY(1,1) PRIMARY KEY,
     device_id  NVARCHAR(50) NOT NULL,
     result     INT          NOT NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     created_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -388,26 +442,58 @@ CREATE TABLE spo2_calculations (
     device_id   NVARCHAR(50) NOT NULL,
     spo2_score  FLOAT        NOT NULL,
     osahs_risk  INT          NULL,
+    user_id     INT          NULL,
+    company_id  INT          NULL,
     created_at  DATETIME2    DEFAULT GETDATE()
+);
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'companies')
+CREATE TABLE companies (
+    id                  INT IDENTITY(1,1) PRIMARY KEY,
+    name                NVARCHAR(200) NOT NULL,
+    registration_number NVARCHAR(100) NULL,
+    contact_email       NVARCHAR(200) NULL,
+    contact_phone       NVARCHAR(50)  NULL,
+    address             NVARCHAR(500) NULL,
+    is_active           BIT           NOT NULL DEFAULT 1,
+    created_at          DATETIME2     DEFAULT GETDATE(),
+    updated_at          DATETIME2     DEFAULT GETDATE()
 );
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'user_profiles')
 BEGIN
     CREATE TABLE user_profiles (
         device_id   NVARCHAR(50)  PRIMARY KEY,
+        user_id     INT           IDENTITY(1,1) NOT NULL,
         name        NVARCHAR(100) NOT NULL,
         surname     NVARCHAR(100) NOT NULL,
         email       NVARCHAR(200) NULL,
         cell        NVARCHAR(30)  NULL,
         emp_no      NVARCHAR(50)  NULL,
         address     NVARCHAR(500) NULL,
+        company_id  INT           NULL REFERENCES companies(id) ON DELETE SET NULL,
         is_active   BIT           NOT NULL DEFAULT 1,
-        updated_at  DATETIME2     DEFAULT GETDATE()
+        updated_at  DATETIME2     DEFAULT GETDATE(),
+        CONSTRAINT uq_user_profiles_user_id UNIQUE (user_id)
     );
 END
-ELSE IF COL_LENGTH('user_profiles', 'is_active') IS NULL
+ELSE
 BEGIN
-    ALTER TABLE user_profiles ADD is_active BIT NOT NULL DEFAULT 1;
+    IF COL_LENGTH('user_profiles', 'is_active') IS NULL
+        ALTER TABLE user_profiles ADD is_active BIT NOT NULL DEFAULT 1;
+    IF COL_LENGTH('user_profiles', 'user_id') IS NULL
+        ALTER TABLE user_profiles ADD user_id INT IDENTITY(1,1) NOT NULL;
+    IF COL_LENGTH('user_profiles', 'company_id') IS NULL
+    BEGIN
+        ALTER TABLE user_profiles ADD company_id INT NULL;
+        IF OBJECT_ID('FK_user_profiles_company_id', 'F') IS NULL
+            ALTER TABLE user_profiles
+                ADD CONSTRAINT FK_user_profiles_company_id
+                FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL;
+    END
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='uq_user_profiles_user_id'
+                   AND object_id=OBJECT_ID('user_profiles'))
+        ALTER TABLE user_profiles ADD CONSTRAINT uq_user_profiles_user_id UNIQUE (user_id);
 END";
             using (var tableCmd = new SqlCommand(ddl, conn))
                 tableCmd.ExecuteNonQuery();
@@ -449,6 +535,51 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
     CREATE INDEX IX_user_profiles_active_name
         ON user_profiles (is_active, surname, name)
         INCLUDE (email, cell, emp_no, address, updated_at);
+
+-- Unique constraints on multi-row-per-device tables to prevent duplicate entries
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UQ_phonebook_device_number'
+               AND object_id=OBJECT_ID('device_phonebook'))
+    ALTER TABLE device_phonebook
+        ADD CONSTRAINT UQ_phonebook_device_number UNIQUE (device_id, number);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UQ_clock_alarm_device_time'
+               AND object_id=OBJECT_ID('device_clock_alarms'))
+    ALTER TABLE device_clock_alarms
+        ADD CONSTRAINT UQ_clock_alarm_device_time UNIQUE (device_id, hour, minute);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UQ_sedentary_device_window'
+               AND object_id=OBJECT_ID('device_sedentary'))
+    ALTER TABLE device_sedentary
+        ADD CONSTRAINT UQ_sedentary_device_window UNIQUE (device_id, start_hour, end_hour);
+
+-- ── Add user_id / company_id to existing tables (idempotent) ─────────────────
+DECLARE @tables NVARCHAR(MAX) = 
+    'gps_tracks,health_snapshots,alarms,sos_events,device_info_log,' +
+    'device_user_info,device_fall_settings,device_data_freq,device_locate_freq,' +
+    'device_lcd_gesture,device_hr_alarm,device_dynamic_hr_alarm,device_spo2_alarm,' +
+    'device_bp_alarm,device_temp_alarm,device_auto_af,device_goal,device_display,' +
+    'device_bp_adjust,device_hr_interval,device_other_interval,device_gps_settings,' +
+    'device_phonebook,device_clock_alarms,device_sedentary,' +
+    'sleep_calculations,ecg_calculations,af_calculations,spo2_calculations';
+
+DECLARE @tbl NVARCHAR(200), @pos INT, @sql NVARCHAR(500);
+WHILE LEN(@tables) > 0
+BEGIN
+    SET @pos  = CHARINDEX(',', @tables);
+    IF @pos   = 0 SET @pos = LEN(@tables) + 1;
+    SET @tbl  = LEFT(@tables, @pos - 1);
+    SET @tables = SUBSTRING(@tables, @pos + 1, LEN(@tables));
+    IF COL_LENGTH(@tbl, 'user_id') IS NULL
+    BEGIN
+        SET @sql = N'ALTER TABLE ' + QUOTENAME(@tbl) + N' ADD user_id INT NULL';
+        EXEC sp_executesql @sql;
+    END
+    IF COL_LENGTH(@tbl, 'company_id') IS NULL
+    BEGIN
+        SET @sql = N'ALTER TABLE ' + QUOTENAME(@tbl) + N' ADD company_id INT NULL';
+        EXEC sp_executesql @sql;
+    END
+END
 ";
             using (var idxCmd = new SqlCommand(indexDdl, conn))
                 idxCmd.ExecuteNonQuery();
@@ -465,8 +596,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                INSERT INTO gps_tracks (device_id, gnss_time, longitude, latitude, loc_type)
-                SELECT @dev, @t, @lon, @lat, @type
+                INSERT INTO gps_tracks (device_id, gnss_time, longitude, latitude, loc_type, user_id, company_id)
+                SELECT @dev, @t, @lon, @lat, @type, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
                 WHERE NOT EXISTS (
                     SELECT 1 FROM gps_tracks
                     WHERE device_id=@dev AND gnss_time=@t AND longitude=@lon AND latitude=@lat)", conn);
@@ -491,8 +624,11 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
                 MERGE health_snapshots AS t
-                USING (SELECT @dev AS device_id, @rt AS record_time) AS s
-                    ON t.device_id = s.device_id AND t.record_time = s.record_time
+                USING (
+                    SELECT @dev AS device_id, @rt AS record_time, u.user_id, u.company_id
+                    FROM (VALUES(1)) AS x(dummy)
+                    LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
+                ) AS s ON t.device_id = s.device_id AND t.record_time = s.record_time
                 WHEN MATCHED THEN UPDATE SET
                     battery  = COALESCE(@bat,  t.battery),
                     rssi     = COALESCE(@rssi, t.rssi),
@@ -505,10 +641,12 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
                     avg_spo2 = COALESCE(@spo,  t.avg_spo2),
                     sbp      = COALESCE(@sbp,  t.sbp),
                     dbp      = COALESCE(@dbp,  t.dbp),
-                    fatigue  = COALESCE(@fat,  t.fatigue)
+                    fatigue  = COALESCE(@fat,  t.fatigue),
+                    user_id    = COALESCE(s.user_id,    t.user_id),
+                    company_id = COALESCE(s.company_id, t.company_id)
                 WHEN NOT MATCHED THEN INSERT
-                    (device_id, record_time, battery, rssi, steps, distance, calorie, avg_hr, max_hr, min_hr, avg_spo2, sbp, dbp, fatigue)
-                    VALUES (@dev, @rt, @bat, @rssi, @stp, @dist, @cal, @ahr, @xhr, @nhr, @spo, @sbp, @dbp, @fat);", conn);
+                    (device_id, record_time, battery, rssi, steps, distance, calorie, avg_hr, max_hr, min_hr, avg_spo2, sbp, dbp, fatigue, user_id, company_id)
+                    VALUES (s.device_id, s.record_time, @bat, @rssi, @stp, @dist, @cal, @ahr, @xhr, @nhr, @spo, @sbp, @dbp, @fat, s.user_id, s.company_id);", conn);
 
             cmd.Parameters.AddWithValue("@dev",  deviceId);
             cmd.Parameters.AddWithValue("@rt",   recordTime);
@@ -535,8 +673,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                INSERT INTO alarms (device_id, alarm_time, alarm_type, details)
-                SELECT @dev, @t, @type, @det
+                INSERT INTO alarms (device_id, alarm_time, alarm_type, details, user_id, company_id)
+                SELECT @dev, @t, @type, @det, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
                 WHERE NOT EXISTS (
                     SELECT 1 FROM alarms
                     WHERE device_id=@dev AND alarm_time=@t AND alarm_type=@type)", conn);
@@ -557,8 +697,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                INSERT INTO sos_events (device_id, alarm_time, latitude, longitude, call_number, call_status, call_start, call_end)
-                SELECT @dev, @t, @lat, @lon, @num, @status, @start, @end
+                INSERT INTO sos_events (device_id, alarm_time, latitude, longitude, call_number, call_status, call_start, call_end, user_id, company_id)
+                SELECT @dev, @t, @lat, @lon, @num, @status, @start, @end, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
                 WHERE NOT EXISTS (
                     SELECT 1 FROM sos_events WHERE device_id=@dev AND alarm_time=@t)", conn);
             cmd.Parameters.AddWithValue("@dev",    deviceId);
@@ -581,8 +723,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                INSERT INTO device_info_log (device_id, recorded_at, model, version, wearing_status, signal, raw_json)
-                VALUES (@dev, @rat, @model, @ver, @wear, @sig, @json)", conn);
+                INSERT INTO device_info_log (device_id, recorded_at, model, version, wearing_status, signal, raw_json, user_id, company_id)
+                SELECT @dev, @rat, @model, @ver, @wear, @sig, @json, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
             cmd.Parameters.AddWithValue("@dev",   deviceId);
             cmd.Parameters.AddWithValue("@rat",   recordedAt);
             cmd.Parameters.AddWithValue("@model", (object?)model         ?? DBNull.Value);
@@ -604,8 +748,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
                 INSERT INTO sleep_calculations
-                    (device_id,record_date,completed,start_time,end_time,hr,turn_times,resp_avg,resp_max,resp_min,sections)
-                VALUES (@dev,@rd,@comp,@st,@et,@hr,@tt,@ra,@rx,@rn,@sec)", conn);
+                    (device_id,record_date,completed,start_time,end_time,hr,turn_times,resp_avg,resp_max,resp_min,sections,user_id,company_id)
+                SELECT @dev,@rd,@comp,@st,@et,@hr,@tt,@ra,@rx,@rn,@sec, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
             cmd.Parameters.AddWithValue("@dev",  deviceId);
             cmd.Parameters.AddWithValue("@rd",   recordDate);
             cmd.Parameters.AddWithValue("@comp", completed);
@@ -628,8 +774,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                INSERT INTO ecg_calculations (device_id,result,hr,effective,direction)
-                VALUES (@dev,@res,@hr,@eff,@dir)", conn);
+                INSERT INTO ecg_calculations (device_id,result,hr,effective,direction,user_id,company_id)
+                SELECT @dev,@res,@hr,@eff,@dir, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
             cmd.Parameters.AddWithValue("@res", result);
             cmd.Parameters.AddWithValue("@hr",  hr);
@@ -646,7 +794,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                INSERT INTO af_calculations (device_id,result) VALUES (@dev,@res)", conn);
+                INSERT INTO af_calculations (device_id,result,user_id,company_id)
+                SELECT @dev,@res, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
             cmd.Parameters.AddWithValue("@res", result);
             cmd.ExecuteNonQuery();
@@ -660,8 +811,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                INSERT INTO spo2_calculations (device_id,spo2_score,osahs_risk)
-                VALUES (@dev,@score,@risk)", conn);
+                INSERT INTO spo2_calculations (device_id,spo2_score,osahs_risk,user_id,company_id)
+                SELECT @dev,@score,@risk, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
             cmd.Parameters.AddWithValue("@dev",   deviceId);
             cmd.Parameters.AddWithValue("@score", spo2Score);
             cmd.Parameters.AddWithValue("@risk",  (object?)oshahsRisk ?? DBNull.Value);
@@ -671,7 +824,8 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
     }
 
     public void UpsertUserProfile(string deviceId, string name, string surname,
-        string? email = null, string? cell = null, string? empNo = null, string? address = null)
+        string? email = null, string? cell = null, string? empNo = null, string? address = null,
+        int? companyId = null)
     {
         try
         {
@@ -686,17 +840,19 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
                     cell       = @cell,
                     emp_no     = @empNo,
                     address    = @address,
+                    company_id = COALESCE(@companyId, t.company_id),
                     is_active  = 1,
                     updated_at = GETDATE()
-                WHEN NOT MATCHED THEN INSERT (device_id, name, surname, email, cell, emp_no, address, is_active)
-                    VALUES (@dev, @name, @surname, @email, @cell, @empNo, @address, 1);", conn);
-            cmd.Parameters.AddWithValue("@dev",     deviceId);
-            cmd.Parameters.AddWithValue("@name",    name);
-            cmd.Parameters.AddWithValue("@surname", surname);
-            cmd.Parameters.AddWithValue("@email",   (object?)email   ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@cell",    (object?)cell    ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@empNo",   (object?)empNo   ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@address", (object?)address ?? DBNull.Value);
+                WHEN NOT MATCHED THEN INSERT (device_id, name, surname, email, cell, emp_no, address, company_id, is_active)
+                    VALUES (@dev, @name, @surname, @email, @cell, @empNo, @address, @companyId, 1);", conn);
+            cmd.Parameters.AddWithValue("@dev",       deviceId);
+            cmd.Parameters.AddWithValue("@name",      name);
+            cmd.Parameters.AddWithValue("@surname",   surname);
+            cmd.Parameters.AddWithValue("@email",     (object?)email     ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@cell",      (object?)cell      ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@empNo",     (object?)empNo     ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@address",   (object?)address   ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@companyId", (object?)companyId ?? DBNull.Value);
             cmd.ExecuteNonQuery();
         }
         catch (Exception ex) { _logger.LogError(ex, "UpsertUserProfile failed for {Device}", deviceId); }
@@ -708,23 +864,15 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                SELECT device_id, name, surname, email, cell, emp_no, address, updated_at
-                FROM user_profiles
-                WHERE device_id = @dev AND is_active = 1", conn);
+                SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
+                       u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
+                FROM user_profiles u
+                LEFT JOIN companies c ON c.id = u.company_id
+                WHERE u.device_id = @dev AND u.is_active = 1", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return null;
-            return new UserProfile
-            {
-                DeviceId  = reader.GetString(0),
-                Name      = reader.GetString(1),
-                Surname   = reader.GetString(2),
-                Email     = reader.IsDBNull(3) ? null : reader.GetString(3),
-                Cell      = reader.IsDBNull(4) ? null : reader.GetString(4),
-                EmpNo     = reader.IsDBNull(5) ? null : reader.GetString(5),
-                Address   = reader.IsDBNull(6) ? null : reader.GetString(6),
-                UpdatedAt = reader.GetDateTime(7)
-            };
+            return MapUserProfile(reader);
         }
         catch (Exception ex)
         {
@@ -740,29 +888,35 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                SELECT device_id, name, surname, email, cell, emp_no, address, updated_at
-                FROM user_profiles
-                WHERE is_active = 1
-                ORDER BY surname, name", conn);
+                SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
+                       u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
+                FROM user_profiles u
+                LEFT JOIN companies c ON c.id = u.company_id
+                WHERE u.is_active = 1
+                ORDER BY u.surname, u.name", conn);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-            {
-                list.Add(new UserProfile
-                {
-                    DeviceId  = reader.GetString(0),
-                    Name      = reader.GetString(1),
-                    Surname   = reader.GetString(2),
-                    Email     = reader.IsDBNull(3) ? null : reader.GetString(3),
-                    Cell      = reader.IsDBNull(4) ? null : reader.GetString(4),
-                    EmpNo     = reader.IsDBNull(5) ? null : reader.GetString(5),
-                    Address   = reader.IsDBNull(6) ? null : reader.GetString(6),
-                    UpdatedAt = reader.GetDateTime(7)
-                });
-            }
+                list.Add(MapUserProfile(reader));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetAllUserProfiles failed."); }
         return list;
     }
+
+    private static UserProfile MapUserProfile(SqlDataReader r) => new()
+    {
+        DeviceId    = r.GetString(0),
+        UserId      = r.GetInt32(1),
+        Name        = r.GetString(2),
+        Surname     = r.GetString(3),
+        Email       = r.IsDBNull(4)  ? null : r.GetString(4),
+        Cell        = r.IsDBNull(5)  ? null : r.GetString(5),
+        EmpNo       = r.IsDBNull(6)  ? null : r.GetString(6),
+        Address     = r.IsDBNull(7)  ? null : r.GetString(7),
+        CompanyId   = r.IsDBNull(8)  ? null : r.GetInt32(8),
+        CompanyName = r.IsDBNull(9)  ? null : r.GetString(9),
+        UpdatedAt   = r.GetDateTime(10),
+        IsActive    = true
+    };
 
     public void DeleteUserProfile(string deviceId)
     {
@@ -777,6 +931,142 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
             cmd.ExecuteNonQuery();
         }
         catch (Exception ex) { _logger.LogError(ex, "DeleteUserProfile failed for {Device}", deviceId); }
+    }
+
+    // ── Company CRUD ───────────────────────────────────────────────────────────
+
+    public int CreateCompany(string name, string? registrationNumber, string? contactEmail,
+        string? contactPhone, string? address)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO companies (name, registration_number, contact_email, contact_phone, address)
+                OUTPUT INSERTED.id
+                VALUES (@name, @reg, @email, @phone, @addr)", conn);
+            cmd.Parameters.AddWithValue("@name",  name);
+            cmd.Parameters.AddWithValue("@reg",   (object?)registrationNumber ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@email", (object?)contactEmail       ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@phone", (object?)contactPhone       ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@addr",  (object?)address            ?? DBNull.Value);
+            return (int)cmd.ExecuteScalar()!;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CreateCompany failed for '{Name}'", name);
+            return -1;
+        }
+    }
+
+    public Company? GetCompany(int id)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT id, name, registration_number, contact_email, contact_phone,
+                       address, is_active, created_at, updated_at
+                FROM companies
+                WHERE id = @id AND is_active = 1", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            return MapCompany(reader);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetCompany failed for id={Id}", id);
+            return null;
+        }
+    }
+
+    public IReadOnlyList<Company> GetAllCompanies()
+    {
+        var list = new List<Company>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT id, name, registration_number, contact_email, contact_phone,
+                       address, is_active, created_at, updated_at
+                FROM companies
+                WHERE is_active = 1
+                ORDER BY name", conn);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                list.Add(MapCompany(reader));
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetAllCompanies failed."); }
+        return list;
+    }
+
+    private static Company MapCompany(SqlDataReader r) => new()
+    {
+        Id                 = r.GetInt32(0),
+        Name               = r.GetString(1),
+        RegistrationNumber = r.IsDBNull(2) ? null : r.GetString(2),
+        ContactEmail       = r.IsDBNull(3) ? null : r.GetString(3),
+        ContactPhone       = r.IsDBNull(4) ? null : r.GetString(4),
+        Address            = r.IsDBNull(5) ? null : r.GetString(5),
+        IsActive           = r.GetBoolean(6),
+        CreatedAt          = r.GetDateTime(7),
+        UpdatedAt          = r.GetDateTime(8)
+    };
+
+    public void UpdateCompany(int id, string name, string? registrationNumber, string? contactEmail,
+        string? contactPhone, string? address)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE companies
+                SET name                = @name,
+                    registration_number = @reg,
+                    contact_email       = @email,
+                    contact_phone       = @phone,
+                    address             = @addr,
+                    updated_at          = GETDATE()
+                WHERE id = @id AND is_active = 1", conn);
+            cmd.Parameters.AddWithValue("@id",    id);
+            cmd.Parameters.AddWithValue("@name",  name);
+            cmd.Parameters.AddWithValue("@reg",   (object?)registrationNumber ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@email", (object?)contactEmail       ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@phone", (object?)contactPhone       ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@addr",  (object?)address            ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "UpdateCompany failed for id={Id}", id); }
+    }
+
+    public void DeleteCompany(int id)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE companies SET is_active = 0, updated_at = GETDATE() WHERE id = @id", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "DeleteCompany failed for id={Id}", id); }
+    }
+
+    public void LinkUserToCompany(string deviceId, int? companyId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE user_profiles
+                SET company_id = @companyId, updated_at = GETDATE()
+                WHERE device_id = @dev AND is_active = 1", conn);
+            cmd.Parameters.AddWithValue("@dev",       deviceId);
+            cmd.Parameters.AddWithValue("@companyId", (object?)companyId ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "LinkUserToCompany failed for {Device}", deviceId); }
     }
 
     public GnssTrack? GetLatestGnssTrack(string deviceId)
@@ -906,28 +1196,18 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_nam
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                SELECT device_id, name, surname, email, cell, emp_no, address, updated_at
-                FROM user_profiles
-                WHERE is_active = 1
-                ORDER BY surname, name
+                SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
+                       u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
+                FROM user_profiles u
+                LEFT JOIN companies c ON c.id = u.company_id
+                WHERE u.is_active = 1
+                ORDER BY u.surname, u.name
                 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
             cmd.Parameters.AddWithValue("@skip", skip);
             cmd.Parameters.AddWithValue("@take", take);
             using var r = cmd.ExecuteReader();
             while (r.Read())
-            {
-                list.Add(new UserProfile
-                {
-                    DeviceId  = r.GetString(0),
-                    Name      = r.GetString(1),
-                    Surname   = r.GetString(2),
-                    Email     = r.IsDBNull(3) ? null : r.GetString(3),
-                    Cell      = r.IsDBNull(4) ? null : r.GetString(4),
-                    EmpNo     = r.IsDBNull(5) ? null : r.GetString(5),
-                    Address   = r.IsDBNull(6) ? null : r.GetString(6),
-                    UpdatedAt = r.GetDateTime(7)
-                });
-            }
+                list.Add(MapUserProfile(r));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetPagedUserProfiles failed."); }
         return list;

@@ -32,13 +32,30 @@ public interface IDatabaseService
     void InsertSpo2Calculation(string deviceId, double spo2Score, int? oshahsRisk);
 
     void UpsertUserProfile(string deviceId, string name, string surname,
-        string? email = null, string? cell = null, string? empNo = null, string? address = null);
+        string? email = null, string? cell = null, string? empNo = null, string? address = null,
+        int? companyId = null);
 
     UserProfile? GetUserProfile(string deviceId);
 
     IReadOnlyList<UserProfile> GetAllUserProfiles();
 
     void DeleteUserProfile(string deviceId);
+
+    // ── Company CRUD ──────────────────────────────────────────────────────────
+
+    int CreateCompany(string name, string? registrationNumber, string? contactEmail,
+        string? contactPhone, string? address);
+
+    Company? GetCompany(int id);
+
+    IReadOnlyList<Company> GetAllCompanies();
+
+    void UpdateCompany(int id, string name, string? registrationNumber, string? contactEmail,
+        string? contactPhone, string? address);
+
+    void DeleteCompany(int id);
+
+    void LinkUserToCompany(string deviceId, int? companyId);
 
     GnssTrack? GetLatestGnssTrack(string deviceId);
 

@@ -10,4 +10,5 @@ public interface IUserService
     Task<ServiceResult<IReadOnlyList<UserResponse>>> GetAllAsync();
     Task<ServiceResult<UserResponse>> UpdateAsync(string deviceId, UpdateUserRequest request);
     Task<ServiceResult<bool>> DeleteAsync(string deviceId);
+    Task<ServiceResult<UserResponse>> LinkToCompanyAsync(string deviceId, int? companyId);
 }

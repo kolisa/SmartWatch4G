@@ -28,7 +28,7 @@ public sealed class UserService : IUserService
                     ServiceResult<UserResponse>.Fail("A user with this device ID already exists.", 409));
 
             _db.UpsertUserProfile(request.DeviceId, request.Name, request.Surname,
-                request.Email, request.Cell, request.EmpNo, request.Address);
+                request.Email, request.Cell, request.EmpNo, request.Address, request.CompanyId);
 
             var created = _db.GetUserProfile(request.DeviceId);
             return Task.FromResult(created is not null
@@ -115,15 +115,41 @@ public sealed class UserService : IUserService
         }
     }
 
+    public Task<ServiceResult<UserResponse>> LinkToCompanyAsync(string deviceId, int? companyId)
+    {
+        try
+        {
+            var existing = _db.GetUserProfile(deviceId);
+            if (existing is null)
+                return Task.FromResult(ServiceResult<UserResponse>.Fail("User not found.", 404));
+
+            _db.LinkUserToCompany(deviceId, companyId);
+
+            var updated = _db.GetUserProfile(deviceId);
+            return Task.FromResult(updated is not null
+                ? ServiceResult<UserResponse>.Ok(Map(updated))
+                : ServiceResult<UserResponse>.Fail("Failed to retrieve user after update.", 500));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "LinkToCompanyAsync failed for DeviceId {DeviceId}", deviceId);
+            return Task.FromResult(ServiceResult<UserResponse>.Fail("An unexpected error occurred.", 500));
+        }
+    }
+
     private static UserResponse Map(UserProfile p) => new()
     {
-        DeviceId  = p.DeviceId,
-        Name      = p.Name,
-        Surname   = p.Surname,
-        Email     = p.Email,
-        Cell      = p.Cell,
-        EmpNo     = p.EmpNo,
-        Address   = p.Address,
-        UpdatedAt = p.UpdatedAt
+        DeviceId    = p.DeviceId,
+        UserId      = p.UserId,
+        Name        = p.Name,
+        Surname     = p.Surname,
+        Email       = p.Email,
+        Cell        = p.Cell,
+        EmpNo       = p.EmpNo,
+        Address     = p.Address,
+        CompanyId   = p.CompanyId,
+        CompanyName = p.CompanyName,
+        UpdatedAt   = p.UpdatedAt
     };
 }
+
