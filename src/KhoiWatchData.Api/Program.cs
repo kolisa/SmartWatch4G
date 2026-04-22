@@ -39,7 +39,7 @@ var app = builder.Build();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(c => c.RoutePrefix = string.Empty);
 
 app.MapControllers();
 
