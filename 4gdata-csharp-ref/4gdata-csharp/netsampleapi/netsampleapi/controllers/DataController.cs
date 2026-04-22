@@ -95,7 +95,7 @@ namespace SampleApi.Controller {
                 switch (opt)
                 {
                     case 0x0A:
-                        oldmanParser.ProceedOldMan(pbPayload);
+                        oldmanParser.ProceedOldMan(pbPayload, device);
                         break;
                     case 0x80:
                         historyDataParser.ProceedHistoryData(pbPayload);

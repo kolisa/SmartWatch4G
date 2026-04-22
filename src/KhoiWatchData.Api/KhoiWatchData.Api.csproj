@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>KhoiWatchData.Api</RootNamespace>
+    <AssemblyName>KhoiWatchData.Api</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartWatch4G.Infrastructure\SmartWatch4G.Infrastructure.csproj" />
+    <ProjectReference Include="..\SmartWatch4G.Jobs\SmartWatch4G.Jobs.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+</Project>

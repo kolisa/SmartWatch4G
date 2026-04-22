@@ -1,96 +1,81 @@
 using Google.Protobuf;
-
 using Microsoft.Extensions.Logging;
-
 using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
+using SmartWatch4G.Domain.Interfaces;
 
 namespace SmartWatch4G.Infrastructure.Processors;
 
-/// <summary>
-/// Parses opcode 0x0A OldMan (OM0) protobuf packets and persists GNSS track data.
-/// Replaces the original <c>OldManProcessor</c> flat-class.
-/// </summary>
-public sealed class OldManProcessor
+public class OldManProcessor
 {
-    private readonly IGnssTrackRepository _gnssRepo;
     private readonly ILogger<OldManProcessor> _logger;
+    private readonly IDatabaseService _db;
 
-    public OldManProcessor(IGnssTrackRepository gnssRepo, ILogger<OldManProcessor> logger)
+    public OldManProcessor(ILogger<OldManProcessor> logger, IDatabaseService db)
     {
-        _gnssRepo = gnssRepo;
         _logger = logger;
+        _db = db;
     }
 
-    public async Task ProcessAsync(
-        string deviceId,
-        byte[] pbData,
-        CancellationToken cancellationToken = default)
+    public void ProceedOldMan(byte[] pbData, string deviceId = "")
     {
         OM0Report omInfo;
         try
         {
             omInfo = OM0Report.Parser.ParseFrom(pbData);
         }
-        catch (InvalidProtocolBufferException ex)
+        catch (InvalidProtocolBufferException e)
         {
-            _logger.LogError("Parse OldMan (OM0) error: {Message}", ex.Message);
+            _logger.LogError("Parse oldman error: {Message}", e.Message);
             return;
         }
 
-        string rtTimeStr = DateTimeUtilities.FromUnixSeconds(omInfo.DateTime.DateTime_.Seconds);
-        int battery = (int)omInfo.Battery.Level;
+        var seconds   = omInfo.DateTime.DateTime_.Seconds;
+        var rtTimeStr = DateTimeUtilities.FromUnixSeconds(seconds);
 
-        uint rssiRaw = omInfo.Rssi;
-        int rssi = rssiRaw > int.MaxValue
-            ? -(int)(~rssiRaw + 1)
-            : (int)rssiRaw;
+        var battery    = (int)omInfo.Battery.Level;
+        var rssiUint32 = omInfo.Rssi;
+        var rssi       = rssiUint32 > int.MaxValue
+            ? -(int)(~rssiUint32 + 1)
+            : (int)rssiUint32;
 
-        _logger.LogDebug("{Time} — battery: {B}%, RSSI: {R} dBm", rtTimeStr, battery, rssi);
+        _logger.LogInformation("----{Time} battery:{Battery}, rssi:{Rssi}", rtTimeStr, battery, rssi);
 
-        long? steps = null;
-        float? dist = null;
-        float? cal = null;
+        if (!string.IsNullOrEmpty(deviceId))
+            _db.UpsertHealthSnapshot(deviceId, rtTimeStr, battery: battery, rssi: rssi);
 
-        if (omInfo.Health is not null)
+        if (omInfo.Health != null)
         {
-            steps = omInfo.Health.Steps;
-            dist = omInfo.Health.Distance * 0.1f;
-            cal = omInfo.Health.Calorie * 0.1f;
-            _logger.LogDebug("{Time} — steps: {S}, dist: {D:F1} m, cal: {C:F1} kcal",
-                rtTimeStr, steps, dist, cal);
+            var rtHealth = omInfo.Health;
+            var distance = rtHealth.Distance * 0.1f;
+            var calorie  = rtHealth.Calorie  * 0.1f;
+            var step     = (int)rtHealth.Steps;
+
+            _logger.LogInformation("----{Time} step:{Step}, distance:{Distance}, calorie:{Calorie}",
+                rtTimeStr, step, distance, calorie);
+
+            if (!string.IsNullOrEmpty(deviceId))
+                _db.UpsertHealthSnapshot(deviceId, rtTimeStr,
+                    steps: step, distance: distance, calorie: calorie);
         }
 
-        if (omInfo.TrackData is null || omInfo.TrackData.Count == 0)
+        // gnss location — WGS-84 coordinate system (not GCJ-02)
+        var trackList = omInfo.TrackData;
+        if (trackList != null && trackList.Count > 0)
         {
-            return;
-        }
-
-        // location data is in WGS-84 coordinate system
-        var records = new List<GnssTrackRecord>(omInfo.TrackData.Count);
-        foreach (var track in omInfo.TrackData)
-        {
-            string gnssTime = DateTimeUtilities.FromUnixSeconds(track.Time.DateTime_.Seconds);
-            _logger.LogDebug(
-                "GNSS {Time} — lon: {Lon}, lat: {Lat}, type: {Type}",
-                gnssTime, track.Gnss.Longitude, track.Gnss.Latitude, track.GpsType);
-
-            records.Add(new GnssTrackRecord
+            foreach (var track in trackList)
             {
-                DeviceId = deviceId,
-                TrackTime = gnssTime,
-                Longitude = track.Gnss.Longitude,
-                Latitude = track.Gnss.Latitude,
-                GpsType = (int)track.GpsType,
-                BatteryLevel = battery,
-                Rssi = rssi,
-                Steps = steps,
-                DistanceMetres = dist,
-                CaloriesKcal = cal
-            });
-        }
+                var trackSeconds = track.Time.DateTime_.Seconds;
+                var gnssTimeStr  = DateTimeUtilities.FromUnixSeconds(trackSeconds);
+                var locateType   = track.GpsType.ToString();
 
-        await _gnssRepo.AddRangeAsync(records, cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation(
+                    "----gnss time:{GnssTime},lon:{Lon},lat:{Lat},loc type:{LocType}",
+                    gnssTimeStr, track.Gnss.Longitude, track.Gnss.Latitude, locateType);
+
+                if (!string.IsNullOrEmpty(deviceId))
+                    _db.InsertGpsTrack(deviceId, gnssTimeStr,
+                        track.Gnss.Longitude, track.Gnss.Latitude, locateType);
+            }
+        }
     }
 }

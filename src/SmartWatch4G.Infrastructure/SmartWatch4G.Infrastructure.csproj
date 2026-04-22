@@ -3,8 +3,7 @@
     <RootNamespace>SmartWatch4G.Infrastructure</RootNamespace>
     <AssemblyName>SmartWatch4G.Infrastructure</AssemblyName>
     <!-- CS8981: lowercase type aliases in auto-generated Protobuf files -->
-    <!-- EF1001: intentional use of internal EF Core APIs in SafeMigrationsModelDiffer -->
-    <NoWarn>$(NoWarn);CS8981;EF1001</NoWarn>
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,15 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" />
     <PackageReference Include="Google.Protobuf" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 </Project>

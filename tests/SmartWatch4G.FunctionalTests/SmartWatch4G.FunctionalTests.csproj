@@ -14,7 +14,6 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="coverlet.collector">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -22,7 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SmartWatch4G.Api\SmartWatch4G.Api.csproj" />
-    <ProjectReference Include="..\..\src\SmartWatch4G.Domain\SmartWatch4G.Domain.csproj" />
+    <ProjectReference Include="..\..\src\KhoiWatchData.Api\KhoiWatchData.Api.csproj" />
   </ItemGroup>
 </Project>

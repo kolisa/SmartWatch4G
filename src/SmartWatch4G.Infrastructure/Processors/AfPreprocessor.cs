@@ -1,75 +1,47 @@
-using System.Text.Json;
-
 using Google.Protobuf;
-
 using Microsoft.Extensions.Logging;
-
 using SmartWatch4G.Application.Utilities;
-using SmartWatch4G.Domain.Entities;
-using SmartWatch4G.Domain.Interfaces.Repositories;
 
 namespace SmartWatch4G.Infrastructure.Processors;
 
-/// <summary>
-/// Preprocesses RRI data from opcode 0x80 history packets for AF calculation.
-/// Persists the decoded RRI sequences so a downstream engine can later combine
-/// any desired time range and compute the AF result.
-/// Replaces the original <c>AfPreprocessor</c> flat-class.
-/// </summary>
-public sealed class AfPreprocessor
+public class AfPreprocessor
 {
-    private readonly IRriDataRepository _rriRepo;
     private readonly ILogger<AfPreprocessor> _logger;
 
-    public AfPreprocessor(IRriDataRepository rriRepo, ILogger<AfPreprocessor> logger)
+    public AfPreprocessor(ILogger<AfPreprocessor> logger)
     {
-        _rriRepo = rriRepo;
         _logger = logger;
     }
 
-    public async Task PrepareRriDataAsync(
-        string deviceId,
-        byte[] pbData,
-        CancellationToken cancellationToken = default)
+    public void PrepareRriData(byte[] pbData)
     {
         HisNotification hisNotify;
         try
         {
             hisNotify = HisNotification.Parser.ParseFrom(pbData);
         }
-        catch (InvalidProtocolBufferException ex)
+        catch (InvalidProtocolBufferException e)
         {
-            _logger.LogError("AF preprocessor — parse error: {Message}", ex.Message);
+            _logger.LogError("Parse 80 health history error: {Message}", e.Message);
             return;
         }
 
-        if (hisNotify.DataCase != HisNotification.DataOneofCase.HisData ||
-            hisNotify.Type != HisDataType.RriData ||
-            hisNotify.HisData.Rri is null)
+        if (hisNotify.DataCase != HisNotification.DataOneofCase.HisData) return;
+
+        var hisData = hisNotify.HisData;
+        _logger.LogInformation("seq: {Seq}", hisData.Seq);
+
+        if (hisNotify.Type == HisDataType.RriData && hisData.Rri != null)
         {
-            return;
+            string timeStr = DateTimeUtilities.FromUnixSeconds(hisData.Rri.TimeStamp.DateTime_.Seconds);
+            var rriList = new List<long>(hisData.Rri.RawData.Count * 2);
+            foreach (var raw in hisData.Rri.RawData)
+            {
+                long v = (long)raw;
+                rriList.Add((v >> 16) & 0xffff);
+                rriList.Add(v & 0xffff);
+            }
+            _logger.LogInformation("----{Time} count:{Count}", timeStr, rriList.Count);
         }
-
-        var hisRri = hisNotify.HisData.Rri;
-        string dataTime = DateTimeUtilities.FromUnixSeconds(hisRri.TimeStamp.DateTime_.Seconds);
-
-        // Unpack two 16-bit values packed into each uint32
-        var rriList = new List<long>(hisRri.RawData.Count * 2);
-        foreach (long raw in hisRri.RawData)
-        {
-            rriList.Add((raw >> 16) & 0x0000_ffff);
-            rriList.Add(raw & 0x0000_ffff);
-        }
-
-        _logger.LogDebug("AF RRI {Time} — count: {Count}", dataTime, rriList.Count);
-
-        await _rriRepo.AddAsync(new RriDataRecord
-        {
-            DeviceId = deviceId,
-            DataTime = dataTime,
-            Seq = hisNotify.HisData.Seq,
-            SampleCount = rriList.Count,
-            RriValuesJson = JsonSerializer.Serialize(rriList)
-        }, cancellationToken).ConfigureAwait(false);
     }
 }
