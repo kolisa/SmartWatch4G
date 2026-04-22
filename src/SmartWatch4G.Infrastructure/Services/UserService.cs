@@ -124,6 +124,8 @@ public sealed class UserService : IUserService
                 return Task.FromResult(ServiceResult<UserResponse>.Fail("User not found.", 404));
 
             _db.LinkUserToCompany(deviceId, companyId);
+            // Propagate the new association to all historical data rows automatically
+            _db.BackfillDeviceRecords(deviceId);
 
             var updated = _db.GetUserProfile(deviceId);
             return Task.FromResult(updated is not null
@@ -134,6 +136,64 @@ public sealed class UserService : IUserService
         {
             _logger.LogError(ex, "LinkToCompanyAsync failed for DeviceId {DeviceId}", deviceId);
             return Task.FromResult(ServiceResult<UserResponse>.Fail("An unexpected error occurred.", 500));
+        }
+    }
+
+    public Task<ServiceResult<IReadOnlyList<UserResponse>>> GetByCompanyIdAsync(int companyId)
+    {
+        try
+        {
+            var profiles = _db.GetUsersByCompanyId(companyId);
+            IReadOnlyList<UserResponse> result = profiles.Select(Map).ToList();
+            return Task.FromResult(ServiceResult<IReadOnlyList<UserResponse>>.Ok(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetByCompanyIdAsync failed for company {Id}", companyId);
+            return Task.FromResult(
+                ServiceResult<IReadOnlyList<UserResponse>>.Fail("An unexpected error occurred.", 500));
+        }
+    }
+
+    public Task<ServiceResult<UserResponse>> ReactivateAsync(string deviceId)
+    {
+        try
+        {
+            var existing = _db.GetUserProfile(deviceId);
+            if (existing is not null && existing.IsActive)
+                return Task.FromResult(ServiceResult<UserResponse>.Fail("User is already active.", 409));
+
+            _db.ReactivateUserProfile(deviceId);
+
+            var reactivated = _db.GetUserProfile(deviceId);
+            return Task.FromResult(reactivated is not null
+                ? ServiceResult<UserResponse>.Ok(Map(reactivated))
+                : ServiceResult<UserResponse>.Fail("User not found.", 404));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ReactivateAsync failed for DeviceId {DeviceId}", deviceId);
+            return Task.FromResult(ServiceResult<UserResponse>.Fail("An unexpected error occurred.", 500));
+        }
+    }
+
+    public Task<ServiceResult<int>> BackfillDeviceRecordsAsync(string deviceId)
+    {
+        try
+        {
+            var existing = _db.GetUserProfile(deviceId);
+            if (existing is null)
+                return Task.FromResult(ServiceResult<int>.Fail("User not found.", 404));
+
+            var rows = _db.BackfillDeviceRecords(deviceId);
+            return rows < 0
+                ? Task.FromResult(ServiceResult<int>.Fail("Backfill encountered an error.", 500))
+                : Task.FromResult(ServiceResult<int>.Ok(rows));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "BackfillDeviceRecordsAsync failed for DeviceId {DeviceId}", deviceId);
+            return Task.FromResult(ServiceResult<int>.Fail("An unexpected error occurred.", 500));
         }
     }
 

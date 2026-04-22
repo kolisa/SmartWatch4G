@@ -11,4 +11,11 @@ public interface IUserService
     Task<ServiceResult<UserResponse>> UpdateAsync(string deviceId, UpdateUserRequest request);
     Task<ServiceResult<bool>> DeleteAsync(string deviceId);
     Task<ServiceResult<UserResponse>> LinkToCompanyAsync(string deviceId, int? companyId);
+
+    Task<ServiceResult<IReadOnlyList<UserResponse>>> GetByCompanyIdAsync(int companyId);
+
+    Task<ServiceResult<UserResponse>> ReactivateAsync(string deviceId);
+
+    /// <summary>Backfills user_id and company_id into every historical data row for the device.</summary>
+    Task<ServiceResult<int>> BackfillDeviceRecordsAsync(string deviceId);
 }

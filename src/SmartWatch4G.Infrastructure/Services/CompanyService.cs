@@ -124,4 +124,40 @@ public sealed class CompanyService : ICompanyService
         CreatedAt          = c.CreatedAt,
         UpdatedAt          = c.UpdatedAt
     };
+
+    public Task<ServiceResult<IReadOnlyList<UserResponse>>> GetUsersAsync(int companyId)
+    {
+        try
+        {
+            var company = _db.GetCompany(companyId);
+            if (company is null)
+                return Task.FromResult(
+                    ServiceResult<IReadOnlyList<UserResponse>>.Fail("Company not found.", 404));
+
+            var profiles = _db.GetUsersByCompanyId(companyId);
+            IReadOnlyList<UserResponse> result = profiles.Select(MapUser).ToList();
+            return Task.FromResult(ServiceResult<IReadOnlyList<UserResponse>>.Ok(result));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetUsersAsync failed for company {Id}", companyId);
+            return Task.FromResult(
+                ServiceResult<IReadOnlyList<UserResponse>>.Fail("An unexpected error occurred.", 500));
+        }
+    }
+
+    private static UserResponse MapUser(SmartWatch4G.Domain.Entities.UserProfile p) => new()
+    {
+        DeviceId    = p.DeviceId,
+        UserId      = p.UserId,
+        Name        = p.Name,
+        Surname     = p.Surname,
+        Email       = p.Email,
+        Cell        = p.Cell,
+        EmpNo       = p.EmpNo,
+        Address     = p.Address,
+        CompanyId   = p.CompanyId,
+        CompanyName = p.CompanyName,
+        UpdatedAt   = p.UpdatedAt
+    };
 }

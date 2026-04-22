@@ -85,4 +85,19 @@ public sealed class CompanyController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>Returns all active users belonging to this company.</summary>
+    [HttpGet("{id:int}/users")]
+    public async Task<IActionResult> GetCompanyUsers(int id)
+    {
+        var result = await _companyService.GetUsersAsync(id);
+        if (result.IsFailure)
+            return result.ErrorCode switch
+            {
+                404 => NotFound(new { message = result.Error }),
+                _   => StatusCode(500, new { message = result.Error })
+            };
+
+        return Ok(result.Value);
+    }
 }

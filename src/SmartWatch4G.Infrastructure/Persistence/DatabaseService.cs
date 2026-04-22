@@ -902,6 +902,43 @@ END
         return list;
     }
 
+    public IReadOnlyList<UserProfile> GetUsersByCompanyId(int companyId)
+    {
+        var list = new List<UserProfile>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
+                       u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
+                FROM user_profiles u
+                LEFT JOIN companies c ON c.id = u.company_id
+                WHERE u.is_active = 1 AND u.company_id = @companyId
+                ORDER BY u.surname, u.name", conn);
+            cmd.Parameters.AddWithValue("@companyId", companyId);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                list.Add(MapUserProfile(reader));
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetUsersByCompanyId failed for company {Id}", companyId); }
+        return list;
+    }
+
+    public void ReactivateUserProfile(string deviceId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE user_profiles
+                SET is_active = 1, updated_at = GETDATE()
+                WHERE device_id = @dev AND is_active = 0", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "ReactivateUserProfile failed for {Device}", deviceId); }
+    }
+
     private static UserProfile MapUserProfile(SqlDataReader r) => new()
     {
         DeviceId    = r.GetString(0),
@@ -1067,6 +1104,55 @@ END
             cmd.ExecuteNonQuery();
         }
         catch (Exception ex) { _logger.LogError(ex, "LinkUserToCompany failed for {Device}", deviceId); }
+    }
+
+    public int BackfillDeviceRecords(string deviceId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+
+            int? userId = null, companyId = null;
+            using (var uCmd = new SqlCommand(
+                "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn))
+            {
+                uCmd.Parameters.AddWithValue("@dev", deviceId);
+                using var rdr = uCmd.ExecuteReader();
+                if (rdr.Read())
+                {
+                    userId    = rdr.IsDBNull(0) ? null : rdr.GetInt32(0);
+                    companyId = rdr.IsDBNull(1) ? null : rdr.GetInt32(1);
+                }
+            }
+
+            string[] tables =
+            [
+                "gps_tracks", "health_snapshots", "alarms", "sos_events", "device_info_log",
+                "device_user_info", "device_fall_settings", "device_data_freq", "device_locate_freq",
+                "device_lcd_gesture", "device_hr_alarm", "device_dynamic_hr_alarm", "device_spo2_alarm",
+                "device_bp_alarm", "device_temp_alarm", "device_auto_af", "device_goal", "device_display",
+                "device_bp_adjust", "device_hr_interval", "device_other_interval", "device_gps_settings",
+                "device_phonebook", "device_clock_alarms", "device_sedentary",
+                "sleep_calculations", "ecg_calculations", "af_calculations", "spo2_calculations"
+            ];
+
+            int total = 0;
+            foreach (var tbl in tables)
+            {
+                using var upd = new SqlCommand(
+                    $"UPDATE [{tbl}] SET user_id=@uid, company_id=@cid WHERE device_id=@dev", conn);
+                upd.Parameters.AddWithValue("@dev", deviceId);
+                upd.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
+                upd.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
+                total += upd.ExecuteNonQuery();
+            }
+            return total;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "BackfillDeviceRecords failed for {Device}", deviceId);
+            return -1;
+        }
     }
 
     public GnssTrack? GetLatestGnssTrack(string deviceId)

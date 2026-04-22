@@ -10,4 +10,5 @@ public interface ICompanyService
     Task<ServiceResult<IReadOnlyList<CompanyResponse>>> GetAllAsync();
     Task<ServiceResult<CompanyResponse>> UpdateAsync(int id, UpdateCompanyRequest request);
     Task<ServiceResult<bool>> DeleteAsync(int id);
+    Task<ServiceResult<IReadOnlyList<UserResponse>>> GetUsersAsync(int companyId);
 }

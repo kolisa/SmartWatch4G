@@ -39,7 +39,11 @@ public interface IDatabaseService
 
     IReadOnlyList<UserProfile> GetAllUserProfiles();
 
+    IReadOnlyList<UserProfile> GetUsersByCompanyId(int companyId);
+
     void DeleteUserProfile(string deviceId);
+
+    void ReactivateUserProfile(string deviceId);
 
     // ── Company CRUD ──────────────────────────────────────────────────────────
 
@@ -56,6 +60,13 @@ public interface IDatabaseService
     void DeleteCompany(int id);
 
     void LinkUserToCompany(string deviceId, int? companyId);
+
+    /// <summary>
+    /// Updates user_id and company_id on every data table row that belongs to this device,
+    /// pulling the values from the active user_profiles entry.
+    /// Returns the total number of rows updated across all tables, or -1 on error.
+    /// </summary>
+    int BackfillDeviceRecords(string deviceId);
 
     GnssTrack? GetLatestGnssTrack(string deviceId);
 

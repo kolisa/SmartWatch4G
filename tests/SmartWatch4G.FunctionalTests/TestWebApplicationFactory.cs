@@ -65,6 +65,9 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         public void UpdateCompany(int id, string name, string? reg, string? email, string? phone, string? addr) { }
         public void DeleteCompany(int id) { }
         public void LinkUserToCompany(string deviceId, int? companyId) { }
+        public int BackfillDeviceRecords(string deviceId) => 0;
+        public IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> GetUsersByCompanyId(int companyId) => [];
+        public void ReactivateUserProfile(string deviceId) { }
 
         // GNSS query methods
         public SmartWatch4G.Domain.Entities.GnssTrack? GetLatestGnssTrack(string deviceId) => null;
