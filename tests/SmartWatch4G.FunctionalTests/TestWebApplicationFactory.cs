@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using SmartWatch4G.Domain.Interfaces;
 
 namespace SmartWatch4G.FunctionalTests;
@@ -19,6 +20,15 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
             var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IDatabaseService));
             if (descriptor is not null) services.Remove(descriptor);
             services.AddSingleton<IDatabaseService, NoOpDatabaseService>();
+
+            // Remove all background hosted services (Quartz scheduler, etc.) in the
+            // test environment so that LogFileMonitorWorker/FileSystemWatcher and
+            // DeviceStatusPollingJob are never instantiated — preventing
+            // ObjectDisposedException crashes on test teardown.
+            var hostedServices = services
+                .Where(d => d.ServiceType == typeof(IHostedService))
+                .ToList();
+            foreach (var svc in hostedServices) services.Remove(svc);
         });
     }
 
@@ -39,5 +49,26 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         public void InsertEcgCalculation(string d, int result, int hr, int eff, int dir) { }
         public void InsertAfCalculation(string d, int result) { }
         public void InsertSpo2Calculation(string d, double score, int? risk) { }
+
+        // User profile methods
+        public void UpsertUserProfile(string deviceId, string name, string surname,
+            string? email=null, string? cell=null, string? empNo=null, string? address=null) { }
+        public SmartWatch4G.Domain.Entities.UserProfile? GetUserProfile(string deviceId) => null;
+        public IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> GetAllUserProfiles() => [];
+        public void DeleteUserProfile(string deviceId) { }
+
+        // GNSS query methods
+        public SmartWatch4G.Domain.Entities.GnssTrack? GetLatestGnssTrack(string deviceId) => null;
+        public IReadOnlyList<SmartWatch4G.Domain.Entities.GnssTrack> GetGnssTracks(
+            string deviceId, System.DateTime? from, System.DateTime? to) => [];
+
+        // Health / stats query methods
+        public SmartWatch4G.Domain.Entities.HealthSnapshot? GetLatestHealthSnapshot(string deviceId) => null;
+        public int GetActiveWorkerCount() => 0;
+        public IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> GetPagedUserProfiles(int skip, int take) => [];
+        public int GetRecentAlarmCount(int withinHours) => 0;
+        public int GetRecentSosCount(int withinHours) => 0;
+        public IReadOnlyList<SmartWatch4G.Domain.Entities.AlarmEvent> GetRecentAlarms(int withinHours, int limit) => [];
+        public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours) => (0, 0, 0);
     }
 }

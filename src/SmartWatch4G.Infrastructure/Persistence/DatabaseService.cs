@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces;
 
 namespace SmartWatch4G.Infrastructure.Persistence;
@@ -388,9 +389,69 @@ CREATE TABLE spo2_calculations (
     spo2_score  FLOAT        NOT NULL,
     osahs_risk  INT          NULL,
     created_at  DATETIME2    DEFAULT GETDATE()
-);";
-            using var cmd = new SqlCommand(ddl, conn);
-            cmd.ExecuteNonQuery();
+);
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'user_profiles')
+BEGIN
+    CREATE TABLE user_profiles (
+        device_id   NVARCHAR(50)  PRIMARY KEY,
+        name        NVARCHAR(100) NOT NULL,
+        surname     NVARCHAR(100) NOT NULL,
+        email       NVARCHAR(200) NULL,
+        cell        NVARCHAR(30)  NULL,
+        emp_no      NVARCHAR(50)  NULL,
+        address     NVARCHAR(500) NULL,
+        is_active   BIT           NOT NULL DEFAULT 1,
+        updated_at  DATETIME2     DEFAULT GETDATE()
+    );
+END
+ELSE IF COL_LENGTH('user_profiles', 'is_active') IS NULL
+BEGIN
+    ALTER TABLE user_profiles ADD is_active BIT NOT NULL DEFAULT 1;
+END";
+            using (var tableCmd = new SqlCommand(ddl, conn))
+                tableCmd.ExecuteNonQuery();
+
+            // ── Indexes (separate batch so all tables are guaranteed to exist) ──────
+            const string indexDdl = @"
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_gps_device_id'
+               AND object_id=OBJECT_ID('gps_tracks'))
+    CREATE INDEX IX_gps_device_id
+        ON gps_tracks (device_id, id DESC)
+        INCLUDE (gnss_time, longitude, latitude, loc_type, created_at);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_gps_device_created'
+               AND object_id=OBJECT_ID('gps_tracks'))
+    CREATE INDEX IX_gps_device_created
+        ON gps_tracks (device_id, created_at ASC)
+        INCLUDE (gnss_time, longitude, latitude, loc_type, id);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_health_device_id'
+               AND object_id=OBJECT_ID('health_snapshots'))
+    CREATE INDEX IX_health_device_id
+        ON health_snapshots (device_id, id DESC)
+        INCLUDE (record_time, battery, rssi, steps, distance, calorie,
+                 avg_hr, max_hr, min_hr, avg_spo2, sbp, dbp, fatigue, created_at);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_alarms_created_at'
+               AND object_id=OBJECT_ID('alarms'))
+    CREATE INDEX IX_alarms_created_at
+        ON alarms (created_at DESC)
+        INCLUDE (device_id, alarm_time, alarm_type, details);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_sos_created_at'
+               AND object_id=OBJECT_ID('sos_events'))
+    CREATE INDEX IX_sos_created_at
+        ON sos_events (created_at DESC);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_active_name'
+               AND object_id=OBJECT_ID('user_profiles'))
+    CREATE INDEX IX_user_profiles_active_name
+        ON user_profiles (is_active, surname, name)
+        INCLUDE (email, cell, emp_no, address, updated_at);
+";
+            using (var idxCmd = new SqlCommand(indexDdl, conn))
+                idxCmd.ExecuteNonQuery();
         }
         catch (Exception ex)
         {
@@ -404,9 +465,11 @@ CREATE TABLE spo2_calculations (
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                IF NOT EXISTS (SELECT 1 FROM gps_tracks WHERE device_id=@dev AND gnss_time=@t AND longitude=@lon AND latitude=@lat)
                 INSERT INTO gps_tracks (device_id, gnss_time, longitude, latitude, loc_type)
-                VALUES (@dev, @t, @lon, @lat, @type)", conn);
+                SELECT @dev, @t, @lon, @lat, @type
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM gps_tracks
+                    WHERE device_id=@dev AND gnss_time=@t AND longitude=@lon AND latitude=@lat)", conn);
             cmd.Parameters.AddWithValue("@dev",  deviceId);
             cmd.Parameters.AddWithValue("@t",    gnssTime);
             cmd.Parameters.AddWithValue("@lon",  longitude);
@@ -472,9 +535,11 @@ CREATE TABLE spo2_calculations (
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                IF NOT EXISTS (SELECT 1 FROM alarms WHERE device_id=@dev AND alarm_time=@t AND alarm_type=@type)
                 INSERT INTO alarms (device_id, alarm_time, alarm_type, details)
-                VALUES (@dev, @t, @type, @det)", conn);
+                SELECT @dev, @t, @type, @det
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM alarms
+                    WHERE device_id=@dev AND alarm_time=@t AND alarm_type=@type)", conn);
             cmd.Parameters.AddWithValue("@dev",  deviceId);
             cmd.Parameters.AddWithValue("@t",    alarmTime);
             cmd.Parameters.AddWithValue("@type", alarmType);
@@ -492,9 +557,10 @@ CREATE TABLE spo2_calculations (
         {
             using var conn = Open(); conn.Open();
             using var cmd = new SqlCommand(@"
-                IF NOT EXISTS (SELECT 1 FROM sos_events WHERE device_id=@dev AND alarm_time=@t)
                 INSERT INTO sos_events (device_id, alarm_time, latitude, longitude, call_number, call_status, call_start, call_end)
-                VALUES (@dev, @t, @lat, @lon, @num, @status, @start, @end)", conn);
+                SELECT @dev, @t, @lat, @lon, @num, @status, @start, @end
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM sos_events WHERE device_id=@dev AND alarm_time=@t)", conn);
             cmd.Parameters.AddWithValue("@dev",    deviceId);
             cmd.Parameters.AddWithValue("@t",      alarmTime);
             cmd.Parameters.AddWithValue("@lat",    (object?)lat        ?? DBNull.Value);
@@ -602,6 +668,359 @@ CREATE TABLE spo2_calculations (
             cmd.ExecuteNonQuery();
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertSpo2Calculation failed for {Device}", deviceId); }
+    }
+
+    public void UpsertUserProfile(string deviceId, string name, string surname,
+        string? email = null, string? cell = null, string? empNo = null, string? address = null)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                MERGE user_profiles AS t
+                USING (SELECT @dev AS device_id) AS s ON t.device_id = s.device_id
+                WHEN MATCHED THEN UPDATE SET
+                    name       = @name,
+                    surname    = @surname,
+                    email      = @email,
+                    cell       = @cell,
+                    emp_no     = @empNo,
+                    address    = @address,
+                    is_active  = 1,
+                    updated_at = GETDATE()
+                WHEN NOT MATCHED THEN INSERT (device_id, name, surname, email, cell, emp_no, address, is_active)
+                    VALUES (@dev, @name, @surname, @email, @cell, @empNo, @address, 1);", conn);
+            cmd.Parameters.AddWithValue("@dev",     deviceId);
+            cmd.Parameters.AddWithValue("@name",    name);
+            cmd.Parameters.AddWithValue("@surname", surname);
+            cmd.Parameters.AddWithValue("@email",   (object?)email   ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@cell",    (object?)cell    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@empNo",   (object?)empNo   ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@address", (object?)address ?? DBNull.Value);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "UpsertUserProfile failed for {Device}", deviceId); }
+    }
+
+    public UserProfile? GetUserProfile(string deviceId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT device_id, name, surname, email, cell, emp_no, address, updated_at
+                FROM user_profiles
+                WHERE device_id = @dev AND is_active = 1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            return new UserProfile
+            {
+                DeviceId  = reader.GetString(0),
+                Name      = reader.GetString(1),
+                Surname   = reader.GetString(2),
+                Email     = reader.IsDBNull(3) ? null : reader.GetString(3),
+                Cell      = reader.IsDBNull(4) ? null : reader.GetString(4),
+                EmpNo     = reader.IsDBNull(5) ? null : reader.GetString(5),
+                Address   = reader.IsDBNull(6) ? null : reader.GetString(6),
+                UpdatedAt = reader.GetDateTime(7)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetUserProfile failed for {Device}", deviceId);
+            return null;
+        }
+    }
+
+    public IReadOnlyList<UserProfile> GetAllUserProfiles()
+    {
+        var list = new List<UserProfile>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT device_id, name, surname, email, cell, emp_no, address, updated_at
+                FROM user_profiles
+                WHERE is_active = 1
+                ORDER BY surname, name", conn);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                list.Add(new UserProfile
+                {
+                    DeviceId  = reader.GetString(0),
+                    Name      = reader.GetString(1),
+                    Surname   = reader.GetString(2),
+                    Email     = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    Cell      = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    EmpNo     = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    Address   = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    UpdatedAt = reader.GetDateTime(7)
+                });
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetAllUserProfiles failed."); }
+        return list;
+    }
+
+    public void DeleteUserProfile(string deviceId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE user_profiles
+                SET is_active = 0, updated_at = GETDATE()
+                WHERE device_id = @dev AND is_active = 1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "DeleteUserProfile failed for {Device}", deviceId); }
+    }
+
+    public GnssTrack? GetLatestGnssTrack(string deviceId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT TOP 1 id, device_id, gnss_time, longitude, latitude, loc_type, created_at
+                FROM gps_tracks
+                WHERE device_id = @dev
+                ORDER BY id DESC", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            return new GnssTrack
+            {
+                Id        = reader.GetInt32(0),
+                DeviceId  = reader.GetString(1),
+                GnssTime  = reader.GetString(2),
+                Longitude = reader.GetDouble(3),
+                Latitude  = reader.GetDouble(4),
+                LocType   = reader.IsDBNull(5) ? null : reader.GetString(5),
+                CreatedAt = reader.GetDateTime(6)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetLatestGnssTrack failed for {Device}", deviceId);
+            return null;
+        }
+    }
+
+    public IReadOnlyList<GnssTrack> GetGnssTracks(string deviceId, System.DateTime? from, System.DateTime? to)
+    {
+        var list = new List<GnssTrack>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT id, device_id, gnss_time, longitude, latitude, loc_type, created_at
+                FROM gps_tracks
+                WHERE device_id = @dev
+                  AND (@from IS NULL OR created_at >= @from)
+                  AND (@to   IS NULL OR created_at <= @to)
+                ORDER BY created_at ASC, id ASC", conn);
+            cmd.Parameters.AddWithValue("@dev",  deviceId);
+            cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+            cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                list.Add(new GnssTrack
+                {
+                    Id        = reader.GetInt32(0),
+                    DeviceId  = reader.GetString(1),
+                    GnssTime  = reader.GetString(2),
+                    Longitude = reader.GetDouble(3),
+                    Latitude  = reader.GetDouble(4),
+                    LocType   = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    CreatedAt = reader.GetDateTime(6)
+                });
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetGnssTracks failed for {Device}", deviceId); }
+        return list;
+    }
+
+    public HealthSnapshot? GetLatestHealthSnapshot(string deviceId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT TOP 1 id, device_id, record_time, battery, rssi, steps,
+                       distance, calorie, avg_hr, max_hr, min_hr,
+                       avg_spo2, sbp, dbp, fatigue, created_at
+                FROM health_snapshots
+                WHERE device_id = @dev
+                ORDER BY id DESC", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+            return new HealthSnapshot
+            {
+                Id         = r.GetInt32(0),
+                DeviceId   = r.GetString(1),
+                RecordTime = r.GetString(2),
+                Battery    = r.IsDBNull(3)  ? null : r.GetInt32(3),
+                Rssi       = r.IsDBNull(4)  ? null : r.GetInt32(4),
+                Steps      = r.IsDBNull(5)  ? null : r.GetInt32(5),
+                Distance   = r.IsDBNull(6)  ? null : r.GetDouble(6),
+                Calorie    = r.IsDBNull(7)  ? null : r.GetDouble(7),
+                AvgHr      = r.IsDBNull(8)  ? null : r.GetInt32(8),
+                MaxHr      = r.IsDBNull(9)  ? null : r.GetInt32(9),
+                MinHr      = r.IsDBNull(10) ? null : r.GetInt32(10),
+                AvgSpo2    = r.IsDBNull(11) ? null : r.GetInt32(11),
+                Sbp        = r.IsDBNull(12) ? null : r.GetInt32(12),
+                Dbp        = r.IsDBNull(13) ? null : r.GetInt32(13),
+                Fatigue    = r.IsDBNull(14) ? null : r.GetInt32(14),
+                CreatedAt  = r.GetDateTime(15)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetLatestHealthSnapshot failed for {Device}", deviceId);
+            return null;
+        }
+    }
+
+    public int GetActiveWorkerCount()
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(
+                "SELECT COUNT(*) FROM user_profiles WHERE is_active = 1", conn);
+            return (int)cmd.ExecuteScalar()!;
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetActiveWorkerCount failed."); return 0; }
+    }
+
+    public IReadOnlyList<UserProfile> GetPagedUserProfiles(int skip, int take)
+    {
+        var list = new List<UserProfile>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT device_id, name, surname, email, cell, emp_no, address, updated_at
+                FROM user_profiles
+                WHERE is_active = 1
+                ORDER BY surname, name
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new UserProfile
+                {
+                    DeviceId  = r.GetString(0),
+                    Name      = r.GetString(1),
+                    Surname   = r.GetString(2),
+                    Email     = r.IsDBNull(3) ? null : r.GetString(3),
+                    Cell      = r.IsDBNull(4) ? null : r.GetString(4),
+                    EmpNo     = r.IsDBNull(5) ? null : r.GetString(5),
+                    Address   = r.IsDBNull(6) ? null : r.GetString(6),
+                    UpdatedAt = r.GetDateTime(7)
+                });
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetPagedUserProfiles failed."); }
+        return list;
+    }
+
+    public int GetRecentAlarmCount(int withinHours)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT COUNT(*)
+                FROM alarms
+                WHERE created_at >= DATEADD(HOUR, -@h, GETDATE())", conn);
+            cmd.Parameters.AddWithValue("@h", withinHours);
+            return (int)cmd.ExecuteScalar()!;
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetRecentAlarmCount failed."); return 0; }
+    }
+
+    public int GetRecentSosCount(int withinHours)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT COUNT(*)
+                FROM sos_events
+                WHERE created_at >= DATEADD(HOUR, -@h, GETDATE())", conn);
+            cmd.Parameters.AddWithValue("@h", withinHours);
+            return (int)cmd.ExecuteScalar()!;
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetRecentSosCount failed."); return 0; }
+    }
+
+    public IReadOnlyList<AlarmEvent> GetRecentAlarms(int withinHours, int limit)
+    {
+        var list = new List<AlarmEvent>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            // Single round trip: JOIN resolves worker name; avoids loading all user profiles in the service layer
+            using var cmd = new SqlCommand(@"
+                SELECT TOP (@limit)
+                    a.id, a.device_id,
+                    CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS worker_name,
+                    a.alarm_time, a.alarm_type, a.details, a.created_at
+                FROM alarms a
+                LEFT JOIN user_profiles u ON u.device_id = a.device_id AND u.is_active = 1
+                WHERE a.created_at >= DATEADD(HOUR, -@h, GETDATE())
+                ORDER BY a.created_at DESC", conn);
+            cmd.Parameters.AddWithValue("@limit", limit);
+            cmd.Parameters.AddWithValue("@h",     withinHours);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(new AlarmEvent
+                {
+                    Id         = r.GetInt32(0),
+                    DeviceId   = r.GetString(1),
+                    WorkerName = r.IsDBNull(2) ? null : r.GetString(2),
+                    AlarmTime  = r.GetString(3),
+                    AlarmType  = r.GetString(4),
+                    Details    = r.IsDBNull(5) ? null : r.GetString(5),
+                    CreatedAt  = r.GetDateTime(6)
+                });
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetRecentAlarms failed."); }
+        return list;
+    }
+
+    public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            // Single round trip replaces three separate COUNT queries
+            using var cmd = new SqlCommand(@"
+                SELECT
+                    (SELECT COUNT(*) FROM user_profiles WHERE is_active = 1),
+                    (SELECT COUNT(*) FROM alarms       WHERE created_at >= DATEADD(HOUR, -@h, GETDATE())),
+                    (SELECT COUNT(*) FROM sos_events   WHERE created_at >= DATEADD(HOUR, -@h, GETDATE()))", conn);
+            cmd.Parameters.AddWithValue("@h", withinHours);
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return (0, 0, 0);
+            return (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetDashboardCounts failed.");
+            return (0, 0, 0);
+        }
     }
 
     public void Dispose() { }

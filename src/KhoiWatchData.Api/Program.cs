@@ -23,7 +23,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<RawDataFileStore>();
 
 // Jobs: FileSystemWatcher + Quartz fallback poller
-builder.Services.AddJobs();
+builder.Services.AddJobs(builder.Configuration);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();

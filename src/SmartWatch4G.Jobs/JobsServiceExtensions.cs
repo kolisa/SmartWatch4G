@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Quartz;
 
@@ -7,25 +8,42 @@ public static class JobsServiceExtensions
 {
     /// <summary>
     /// Registers the Quartz scheduler, the log-file monitor singleton worker,
-    /// and the 2-second fallback polling job.
+    /// the 2-second fallback polling job, and the 30-second device status polling job.
     /// Call this from <c>KhoiWatchData.Api/Program.cs</c>.
     /// </summary>
-    public static IServiceCollection AddJobs(this IServiceCollection services)
+    public static IServiceCollection AddJobs(this IServiceCollection services, IConfiguration configuration)
     {
         // Singleton worker owns the FileSystemWatcher + state — must outlive jobs
         services.AddSingleton<LogFileMonitorWorker>();
 
+        var pollingIntervalSeconds = configuration.GetValue("DeviceStatusPolling:IntervalSeconds", 30);
+
         services.AddQuartz(q =>
         {
-            var jobKey = new JobKey("LogFileMonitorJob");
+            // ── Log-file monitor (2-second fallback polling) ─────────────────
+            var logJobKey = new JobKey("LogFileMonitorJob");
 
-            q.AddJob<LogFileMonitorJob>(opts => opts.WithIdentity(jobKey));
+            q.AddJob<LogFileMonitorJob>(opts => opts.WithIdentity(logJobKey));
 
             q.AddTrigger(opts => opts
-                .ForJob(jobKey)
+                .ForJob(logJobKey)
                 .WithIdentity("LogFileMonitorJob-trigger")
                 .WithSimpleSchedule(x => x
                     .WithIntervalInSeconds(2)
+                    .RepeatForever()));
+
+            // ── Device status polling job ─────────────────────────────────────
+            var statusJobKey = new JobKey("DeviceStatusPollingJob");
+
+            q.AddJob<DeviceStatusPollingJob>(opts => opts.WithIdentity(statusJobKey));
+
+            q.AddTrigger(opts => opts
+                .ForJob(statusJobKey)
+                .WithIdentity("DeviceStatusPollingJob-trigger")
+                // Run once immediately on startup, then repeat at the configured interval
+                .StartNow()
+                .WithSimpleSchedule(x => x
+                    .WithIntervalInSeconds(pollingIntervalSeconds)
                     .RepeatForever()));
         });
 

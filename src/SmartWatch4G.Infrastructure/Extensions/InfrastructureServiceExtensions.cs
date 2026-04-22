@@ -18,6 +18,16 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<IDatabaseService, DatabaseService>();
         services.AddSingleton<IDeviceSettingsService, DeviceSettingsService>();
 
+        // ── Device status cache (singleton — shared with background polling job) ──
+        services.AddSingleton<IDeviceStatusCache, DeviceStatusCache>();
+
+        // ── Application services ──────────────────────────────────────────────
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<ITrackingQueryService, TrackingQueryService>();
+        services.AddScoped<IWorkerQueryService, WorkerQueryService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IAlertQueryService, AlertQueryService>();
+
         // ── Processors ────────────────────────────────────────────────────────
         services.AddSingleton<OldManProcessor>();
         services.AddSingleton<HistoryDataProcessor>();

@@ -23,6 +23,7 @@ public sealed class LogFileMonitorWorker : IDisposable
 
     // one active execution at a time (FSW + Quartz may both fire concurrently)
     private readonly SemaphoreSlim _lock = new(1, 1);
+    private volatile bool _disposed;
 
     private Dictionary<string, long> _offsets = new();
     private string _currentFile  = string.Empty;
@@ -88,6 +89,8 @@ public sealed class LogFileMonitorWorker : IDisposable
     private void OnFileEvent(object sender, FileSystemEventArgs e)
     {
         // Non-blocking try — if Quartz is already processing, skip; it will catch up
+        // Guard against callbacks firing after Dispose (e.g. during test teardown)
+        if (_disposed) return;
         if (_lock.Wait(0))
         {
             try  { InternalExecute(); }
@@ -100,6 +103,7 @@ public sealed class LogFileMonitorWorker : IDisposable
 
     public void Execute()
     {
+        if (_disposed) return;
         if (_lock.Wait(0))
         {
             try  { InternalExecute(); }
@@ -133,7 +137,7 @@ public sealed class LogFileMonitorWorker : IDisposable
         var dir  = Path.GetDirectoryName(Path.GetFullPath(_logBasePath)) ?? ".";
         var stem = Path.GetFileNameWithoutExtension(_logBasePath);
         var ext  = Path.GetExtension(_logBasePath);
-        return Path.Combine(dir, $"{stem}_{DateTime.Now:yyyy-MM-dd}{ext}");
+        return Path.Combine(dir, $"{stem}_{System.DateTime.Now:yyyy-MM-dd}{ext}");
     }
 
     private void LoadState()
@@ -338,7 +342,7 @@ public sealed class LogFileMonitorWorker : IDisposable
             var root      = doc.RootElement;
             _db.InsertDeviceInfo(
                 root.GetProperty("deviceid").GetString() ?? _currentDeviceId,
-                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 root.TryGetProperty("model",          out var mo) ? mo.GetString() : null,
                 root.TryGetProperty("version",        out var ve) ? ve.GetString() : null,
                 root.TryGetProperty("wearing_status", out var ws) ? ws.GetString() : null,
@@ -350,7 +354,12 @@ public sealed class LogFileMonitorWorker : IDisposable
 
     public void Dispose()
     {
-        _watcher?.Dispose();
+        _disposed = true;
+        if (_watcher is not null)
+        {
+            _watcher.EnableRaisingEvents = false;
+            _watcher.Dispose();
+        }
         _lock.Dispose();
     }
 }

@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SmartWatch4G.Domain\SmartWatch4G.Domain.csproj" />
+    <ProjectReference Include="..\SmartWatch4G.Application\SmartWatch4G.Application.csproj" />
+    <ProjectReference Include="..\SmartWatch4G.Infrastructure\SmartWatch4G.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

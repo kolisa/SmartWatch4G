@@ -1,3 +1,5 @@
+using SmartWatch4G.Domain.Entities;
+
 namespace SmartWatch4G.Domain.Interfaces;
 
 public interface IDatabaseService
@@ -28,4 +30,35 @@ public interface IDatabaseService
     void InsertAfCalculation(string deviceId, int result);
 
     void InsertSpo2Calculation(string deviceId, double spo2Score, int? oshahsRisk);
+
+    void UpsertUserProfile(string deviceId, string name, string surname,
+        string? email = null, string? cell = null, string? empNo = null, string? address = null);
+
+    UserProfile? GetUserProfile(string deviceId);
+
+    IReadOnlyList<UserProfile> GetAllUserProfiles();
+
+    void DeleteUserProfile(string deviceId);
+
+    GnssTrack? GetLatestGnssTrack(string deviceId);
+
+    IReadOnlyList<GnssTrack> GetGnssTracks(string deviceId, System.DateTime? from, System.DateTime? to);
+
+    HealthSnapshot? GetLatestHealthSnapshot(string deviceId);
+
+    int GetActiveWorkerCount();
+
+    IReadOnlyList<UserProfile> GetPagedUserProfiles(int skip, int take);
+
+    int GetRecentAlarmCount(int withinHours);
+
+    int GetRecentSosCount(int withinHours);
+
+    IReadOnlyList<AlarmEvent> GetRecentAlarms(int withinHours, int limit);
+
+    /// <summary>
+    /// Returns worker count, alarm count, and SOS count for the given time window
+    /// in a single round trip — avoids three separate COUNT queries for the dashboard.
+    /// </summary>
+    (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours);
 }
