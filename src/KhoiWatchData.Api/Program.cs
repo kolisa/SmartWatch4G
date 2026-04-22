@@ -39,7 +39,11 @@ var app = builder.Build();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseSwagger();
-app.UseSwaggerUI(c => c.RoutePrefix = string.Empty);
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "SmartWatch4G API v1");
+    c.RoutePrefix = string.Empty;
+});
 
 app.MapControllers();
 
