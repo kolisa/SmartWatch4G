@@ -1450,5 +1450,479 @@ END
         }
     }
 
+    // ── GPS queries ───────────────────────────────────────────────────────────
+
+    public (IReadOnlyList<(string DeviceId, string? UserName, GnssTrack Track)> Items, int TotalCount)
+        GetGnssTracksByCompany(int companyId, System.DateTime? from, System.DateTime? to,
+            int skip, int take, string sortDir, bool onlineOnly, bool offlineOnly)
+    {
+        var list  = new List<(string, string?, GnssTrack)>();
+        int total = 0;
+        try
+        {
+            var dir  = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+            var sql  = $@"
+                SELECT g.device_id,
+                       CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
+                       g.id, g.gnss_time, g.longitude, g.latitude, g.loc_type, g.created_at
+                FROM gps_tracks g
+                INNER JOIN user_profiles u ON u.device_id = g.device_id AND u.is_active = 1
+                WHERE u.company_id = @cid
+                  AND (@from IS NULL OR g.created_at >= @from)
+                  AND (@to   IS NULL OR g.created_at <= @to)
+                ORDER BY g.created_at {dir}
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY";
+
+            var countSql = @"
+                SELECT COUNT(*)
+                FROM gps_tracks g
+                INNER JOIN user_profiles u ON u.device_id = g.device_id AND u.is_active = 1
+                WHERE u.company_id = @cid
+                  AND (@from IS NULL OR g.created_at >= @from)
+                  AND (@to   IS NULL OR g.created_at <= @to)";
+
+            using var conn = Open(); conn.Open();
+            using (var cmd = new SqlCommand(countSql, conn))
+            {
+                cmd.Parameters.AddWithValue("@cid", companyId);
+                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+                total = (int)cmd.ExecuteScalar()!;
+            }
+
+            using (var cmd = new SqlCommand(sql, conn))
+            {
+                cmd.Parameters.AddWithValue("@cid",  companyId);
+                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+                cmd.Parameters.AddWithValue("@skip", skip);
+                cmd.Parameters.AddWithValue("@take", take);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var track = new GnssTrack
+                    {
+                        Id        = r.GetInt32(2),
+                        DeviceId  = r.GetString(0),
+                        GnssTime  = r.GetString(3),
+                        Longitude = r.GetDouble(4),
+                        Latitude  = r.GetDouble(5),
+                        LocType   = r.IsDBNull(6) ? null : r.GetString(6),
+                        CreatedAt = r.GetDateTime(7)
+                    };
+                    list.Add((r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1), track));
+                }
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetGnssTracksByCompany failed for company {Id}", companyId); }
+        return (list, total);
+    }
+
+    public (int Online, int Offline) GetDeviceStatusCountsByCompany(int companyId,
+        System.Collections.Generic.IReadOnlyList<string> onlineDeviceIds)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(
+                "SELECT device_id FROM user_profiles WHERE company_id=@cid AND is_active=1", conn);
+            cmd.Parameters.AddWithValue("@cid", companyId);
+            using var r = cmd.ExecuteReader();
+            int online = 0, offline = 0;
+            var onlineSet = new System.Collections.Generic.HashSet<string>(
+                onlineDeviceIds, StringComparer.OrdinalIgnoreCase);
+            while (r.Read())
+            {
+                var did = r.GetString(0);
+                if (onlineSet.Contains(did)) online++; else offline++;
+            }
+            return (online, offline);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetDeviceStatusCountsByCompany failed for company {Id}", companyId);
+            return (0, 0);
+        }
+    }
+
+    // ── Health queries ────────────────────────────────────────────────────────
+
+    public (IReadOnlyList<HealthSnapshot> Items, int TotalCount)
+        GetHealthSnapshotsByDevice(string deviceId, System.DateTime? from, System.DateTime? to,
+            int skip, int take, string sortDir)
+    {
+        var list  = new List<HealthSnapshot>();
+        int total = 0;
+        try
+        {
+            var dir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+            using var conn = Open(); conn.Open();
+
+            using (var cmd = new SqlCommand(@"
+                SELECT COUNT(*) FROM health_snapshots
+                WHERE device_id=@dev
+                  AND (@from IS NULL OR created_at >= @from)
+                  AND (@to   IS NULL OR created_at <= @to)", conn))
+            {
+                cmd.Parameters.AddWithValue("@dev", deviceId);
+                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+                total = (int)cmd.ExecuteScalar()!;
+            }
+
+            using (var cmd = new SqlCommand($@"
+                SELECT id, device_id, record_time, battery, rssi, steps,
+                       distance, calorie, avg_hr, max_hr, min_hr,
+                       avg_spo2, sbp, dbp, fatigue, created_at
+                FROM health_snapshots
+                WHERE device_id=@dev
+                  AND (@from IS NULL OR created_at >= @from)
+                  AND (@to   IS NULL OR created_at <= @to)
+                ORDER BY created_at {dir}
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn))
+            {
+                cmd.Parameters.AddWithValue("@dev",  deviceId);
+                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+                cmd.Parameters.AddWithValue("@skip", skip);
+                cmd.Parameters.AddWithValue("@take", take);
+                using var r = cmd.ExecuteReader();
+                while (r.Read()) list.Add(MapHealthSnapshot(r));
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetHealthSnapshotsByDevice failed for {Device}", deviceId); }
+        return (list, total);
+    }
+
+    public (IReadOnlyList<(string DeviceId, string? UserName, HealthSnapshot Snapshot)> Items, int TotalCount)
+        GetHealthSnapshotsByCompany(int companyId, System.DateTime? from, System.DateTime? to,
+            int skip, int take, string sortDir)
+    {
+        var list  = new List<(string, string?, HealthSnapshot)>();
+        int total = 0;
+        try
+        {
+            var dir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+            using var conn = Open(); conn.Open();
+
+            using (var cmd = new SqlCommand(@"
+                SELECT COUNT(*) FROM health_snapshots h
+                INNER JOIN user_profiles u ON u.device_id=h.device_id AND u.is_active=1
+                WHERE u.company_id=@cid
+                  AND (@from IS NULL OR h.created_at >= @from)
+                  AND (@to   IS NULL OR h.created_at <= @to)", conn))
+            {
+                cmd.Parameters.AddWithValue("@cid", companyId);
+                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+                total = (int)cmd.ExecuteScalar()!;
+            }
+
+            using (var cmd = new SqlCommand($@"
+                SELECT h.id, h.device_id,
+                       CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END,
+                       h.record_time, h.battery, h.rssi, h.steps,
+                       h.distance, h.calorie, h.avg_hr, h.max_hr, h.min_hr,
+                       h.avg_spo2, h.sbp, h.dbp, h.fatigue, h.created_at
+                FROM health_snapshots h
+                INNER JOIN user_profiles u ON u.device_id=h.device_id AND u.is_active=1
+                WHERE u.company_id=@cid
+                  AND (@from IS NULL OR h.created_at >= @from)
+                  AND (@to   IS NULL OR h.created_at <= @to)
+                ORDER BY h.created_at {dir}
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn))
+            {
+                cmd.Parameters.AddWithValue("@cid", companyId);
+                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+                cmd.Parameters.AddWithValue("@skip", skip);
+                cmd.Parameters.AddWithValue("@take", take);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var snap = new HealthSnapshot
+                    {
+                        Id         = r.GetInt32(0),
+                        DeviceId   = r.GetString(1),
+                        RecordTime = r.GetString(3),
+                        Battery    = r.IsDBNull(4)  ? null : r.GetInt32(4),
+                        Rssi       = r.IsDBNull(5)  ? null : r.GetInt32(5),
+                        Steps      = r.IsDBNull(6)  ? null : r.GetInt32(6),
+                        Distance   = r.IsDBNull(7)  ? null : r.GetDouble(7),
+                        Calorie    = r.IsDBNull(8)  ? null : r.GetDouble(8),
+                        AvgHr      = r.IsDBNull(9)  ? null : r.GetInt32(9),
+                        MaxHr      = r.IsDBNull(10) ? null : r.GetInt32(10),
+                        MinHr      = r.IsDBNull(11) ? null : r.GetInt32(11),
+                        AvgSpo2    = r.IsDBNull(12) ? null : r.GetInt32(12),
+                        Sbp        = r.IsDBNull(13) ? null : r.GetInt32(13),
+                        Dbp        = r.IsDBNull(14) ? null : r.GetInt32(14),
+                        Fatigue    = r.IsDBNull(15) ? null : r.GetInt32(15),
+                        CreatedAt  = r.GetDateTime(16)
+                    };
+                    list.Add((r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), snap));
+                }
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetHealthSnapshotsByCompany failed for company {Id}", companyId); }
+        return (list, total);
+    }
+
+    public IReadOnlyList<(string DeviceId, string? UserName, double? AvgHr, double? AvgSpo2,
+        double? AvgFatigue, int? MaxHr, int? MinHr, int? TotalSteps, int Count)>
+        GetHealthSummaryByCompany(int companyId, System.DateTime? from, System.DateTime? to)
+    {
+        var list = new List<(string, string?, double?, double?, double?, int?, int?, int?, int)>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT h.device_id,
+                       CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
+                       AVG(CAST(h.avg_hr   AS FLOAT)), AVG(CAST(h.avg_spo2 AS FLOAT)),
+                       AVG(CAST(h.fatigue  AS FLOAT)),
+                       MAX(h.max_hr), MIN(h.min_hr), SUM(h.steps), COUNT(*)
+                FROM health_snapshots h
+                INNER JOIN user_profiles u ON u.device_id=h.device_id AND u.is_active=1
+                WHERE u.company_id=@cid
+                  AND (@from IS NULL OR h.created_at >= @from)
+                  AND (@to   IS NULL OR h.created_at <= @to)
+                GROUP BY h.device_id, u.name, u.surname
+                ORDER BY u.surname, u.name", conn);
+            cmd.Parameters.AddWithValue("@cid", companyId);
+            cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+            cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add((
+                    r.GetString(0),
+                    r.IsDBNull(1) ? null : r.GetString(1),
+                    r.IsDBNull(2) ? null : r.GetDouble(2),
+                    r.IsDBNull(3) ? null : r.GetDouble(3),
+                    r.IsDBNull(4) ? null : r.GetDouble(4),
+                    r.IsDBNull(5) ? null : r.GetInt32(5),
+                    r.IsDBNull(6) ? null : r.GetInt32(6),
+                    r.IsDBNull(7) ? null : (int?)r.GetInt64(7),
+                    r.GetInt32(8)
+                ));
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetHealthSummaryByCompany failed for company {Id}", companyId); }
+        return list;
+    }
+
+    // ── Device configuration queries ──────────────────────────────────────────
+
+    private static readonly string DeviceConfigSelectCols = @"
+        u.device_id,
+        CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
+        GREATEST(df.updated_at, lf.updated_at, ha.updated_at, dha.updated_at,
+                 sa.updated_at, ba.updated_at, ta.updated_at, fs.updated_at,
+                 dd.updated_at, hi.updated_at, oi.updated_at, dg.updated_at,
+                 gs.updated_at, lg.updated_at, aaf.updated_at, bpa.updated_at) AS last_updated,
+        df.gps_auto_check, df.gps_interval_time, df.power_mode,
+        lf.data_auto_upload, lf.data_upload_interval, lf.auto_locate, lf.locate_interval_time,
+        ha.open  AS hr_alarm_open,  ha.high AS hr_alarm_high, ha.low AS hr_alarm_low,
+        ha.threshold, ha.alarm_interval,
+        dha.open AS dyn_hr_open, dha.high AS dyn_hr_high, dha.low AS dyn_hr_low,
+        dha.timeout, dha.interval AS dyn_hr_interval,
+        sa.open  AS spo2_open,  sa.low  AS spo2_low,
+        ba.open  AS bp_open,    ba.sbp_high, ba.sbp_below, ba.dbp_high, ba.dbp_below,
+        ta.open  AS temp_open,  ta.high AS temp_high, ta.low AS temp_low,
+        fs.fall_check, fs.fall_threshold,
+        dd.language, dd.hour_format, dd.date_format, dd.distance_unit, dd.temperature_unit, dd.wear_hand_right,
+        hi.interval AS hr_interval,
+        oi.interval AS other_interval,
+        dg.step, dg.distance AS goal_distance, dg.calorie AS goal_calorie,
+        gs.gps_auto_check AS gps_locate_auto, gs.gps_interval_time AS gps_locate_interval, gs.run_gps,
+        lg.open AS lcd_open, lg.start_hour AS lcd_start, lg.end_hour AS lcd_end,
+        aaf.open AS af_open, aaf.interval AS af_interval,
+        bpa.sbp_band, bpa.dbp_band, bpa.sbp_meter, bpa.dbp_meter";
+
+    private static readonly string DeviceConfigJoins = @"
+        LEFT JOIN device_data_freq      df  ON df.device_id  = u.device_id
+        LEFT JOIN device_locate_freq    lf  ON lf.device_id  = u.device_id
+        LEFT JOIN device_hr_alarm       ha  ON ha.device_id  = u.device_id
+        LEFT JOIN device_dynamic_hr_alarm dha ON dha.device_id = u.device_id
+        LEFT JOIN device_spo2_alarm     sa  ON sa.device_id  = u.device_id
+        LEFT JOIN device_bp_alarm       ba  ON ba.device_id  = u.device_id
+        LEFT JOIN device_temp_alarm     ta  ON ta.device_id  = u.device_id
+        LEFT JOIN device_fall_settings  fs  ON fs.device_id  = u.device_id
+        LEFT JOIN device_display        dd  ON dd.device_id  = u.device_id
+        LEFT JOIN device_hr_interval    hi  ON hi.device_id  = u.device_id
+        LEFT JOIN device_other_interval oi  ON oi.device_id  = u.device_id
+        LEFT JOIN device_goal           dg  ON dg.device_id  = u.device_id
+        LEFT JOIN device_gps_settings   gs  ON gs.device_id  = u.device_id
+        LEFT JOIN device_lcd_gesture    lg  ON lg.device_id  = u.device_id
+        LEFT JOIN device_auto_af        aaf ON aaf.device_id = u.device_id
+        LEFT JOIN device_bp_adjust      bpa ON bpa.device_id = u.device_id";
+
+    private static (string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+        bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
+        bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
+        bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
+        bool? DynHrAlarmOpen, int? DynHrAlarmHigh, int? DynHrAlarmLow, int? DynHrAlarmTimeout, int? DynHrAlarmInterval,
+        bool? Spo2AlarmOpen, int? Spo2AlarmLow,
+        bool? BpAlarmOpen, int? BpSbpHigh, int? BpSbpBelow, int? BpDbpHigh, int? BpDbpBelow,
+        bool? TempAlarmOpen, double? TempAlarmHigh, double? TempAlarmLow,
+        bool? FallCheckEnabled, int? FallThreshold,
+        string? Language, int? HourFormat, string? DateFormat, int? DistanceUnit, int? TemperatureUnit, bool? WearHandRight,
+        int? HrInterval, int? OtherInterval,
+        int? GoalStep, double? GoalDistance, double? GoalCalorie,
+        bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
+        bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
+        bool? AutoAfOpen, int? AutoAfInterval,
+        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)
+        MapDeviceConfigRow(SqlDataReader r)
+    {
+        bool? B(int i) => r.IsDBNull(i) ? null : r.GetBoolean(i);
+        int?  I(int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
+        double? D(int i) => r.IsDBNull(i) ? null : r.GetDouble(i);
+        string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
+
+        return (
+            r.GetString(0), S(1), r.IsDBNull(2) ? null : r.GetDateTime(2),
+            B(3),  I(4),  I(5),
+            B(6),  I(7),  B(8),  I(9),
+            B(10), I(11), I(12), I(13), I(14),
+            B(15), I(16), I(17), I(18), I(19),
+            B(20), I(21),
+            B(22), I(23), I(24), I(25), I(26),
+            B(27), D(28), D(29),
+            B(30), I(31),
+            S(32), I(33), S(34), I(35), I(36), B(37),
+            I(38), I(39),
+            I(40), D(41), D(42),
+            B(43), I(44), B(45),
+            B(46), I(47), I(48),
+            B(49), I(50),
+            D(51), D(52), D(53), D(54)
+        );
+    }
+
+    public (string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+        bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
+        bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
+        bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
+        bool? DynHrAlarmOpen, int? DynHrAlarmHigh, int? DynHrAlarmLow, int? DynHrAlarmTimeout, int? DynHrAlarmInterval,
+        bool? Spo2AlarmOpen, int? Spo2AlarmLow,
+        bool? BpAlarmOpen, int? BpSbpHigh, int? BpSbpBelow, int? BpDbpHigh, int? BpDbpBelow,
+        bool? TempAlarmOpen, double? TempAlarmHigh, double? TempAlarmLow,
+        bool? FallCheckEnabled, int? FallThreshold,
+        string? Language, int? HourFormat, string? DateFormat, int? DistanceUnit, int? TemperatureUnit, bool? WearHandRight,
+        int? HrInterval, int? OtherInterval,
+        int? GoalStep, double? GoalDistance, double? GoalCalorie,
+        bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
+        bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
+        bool? AutoAfOpen, int? AutoAfInterval,
+        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)?
+        GetDeviceConfig(string deviceId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand($@"
+                SELECT {DeviceConfigSelectCols}
+                FROM user_profiles u
+                {DeviceConfigJoins}
+                WHERE u.device_id = @dev AND u.is_active = 1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return null;
+            return MapDeviceConfigRow(r);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetDeviceConfig failed for {Device}", deviceId);
+            return null;
+        }
+    }
+
+    public IReadOnlyList<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+        bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
+        bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
+        bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
+        bool? DynHrAlarmOpen, int? DynHrAlarmHigh, int? DynHrAlarmLow, int? DynHrAlarmTimeout, int? DynHrAlarmInterval,
+        bool? Spo2AlarmOpen, int? Spo2AlarmLow,
+        bool? BpAlarmOpen, int? BpSbpHigh, int? BpSbpBelow, int? BpDbpHigh, int? BpDbpBelow,
+        bool? TempAlarmOpen, double? TempAlarmHigh, double? TempAlarmLow,
+        bool? FallCheckEnabled, int? FallThreshold,
+        string? Language, int? HourFormat, string? DateFormat, int? DistanceUnit, int? TemperatureUnit, bool? WearHandRight,
+        int? HrInterval, int? OtherInterval,
+        int? GoalStep, double? GoalDistance, double? GoalCalorie,
+        bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
+        bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
+        bool? AutoAfOpen, int? AutoAfInterval,
+        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)>
+        GetDeviceConfigsByCompany(int companyId, int skip, int take)
+    {
+        var list = new List<(string, string?, System.DateTime?,
+            bool?, int?, int?, bool?, int?, bool?, int?,
+            bool?, int?, int?, int?, int?,
+            bool?, int?, int?, int?, int?,
+            bool?, int?,
+            bool?, int?, int?, int?, int?,
+            bool?, double?, double?,
+            bool?, int?,
+            string?, int?, string?, int?, int?, bool?,
+            int?, int?,
+            int?, double?, double?,
+            bool?, int?, bool?,
+            bool?, int?, int?,
+            bool?, int?,
+            double?, double?, double?, double?)>();
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand($@"
+                SELECT {DeviceConfigSelectCols}
+                FROM user_profiles u
+                {DeviceConfigJoins}
+                WHERE u.company_id = @cid AND u.is_active = 1
+                ORDER BY u.surname, u.name
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
+            cmd.Parameters.AddWithValue("@cid",  companyId);
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) list.Add(MapDeviceConfigRow(r));
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetDeviceConfigsByCompany failed for company {Id}", companyId); }
+        return list;
+    }
+
+    public int GetDeviceConfigCountByCompany(int companyId)
+    {
+        try
+        {
+            using var conn = Open(); conn.Open();
+            using var cmd = new SqlCommand(
+                "SELECT COUNT(*) FROM user_profiles WHERE company_id=@cid AND is_active=1", conn);
+            cmd.Parameters.AddWithValue("@cid", companyId);
+            return (int)cmd.ExecuteScalar()!;
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetDeviceConfigCountByCompany failed for company {Id}", companyId); return 0; }
+    }
+
+    private static HealthSnapshot MapHealthSnapshot(SqlDataReader r) => new()
+    {
+        Id         = r.GetInt32(0),
+        DeviceId   = r.GetString(1),
+        RecordTime = r.GetString(2),
+        Battery    = r.IsDBNull(3)  ? null : r.GetInt32(3),
+        Rssi       = r.IsDBNull(4)  ? null : r.GetInt32(4),
+        Steps      = r.IsDBNull(5)  ? null : r.GetInt32(5),
+        Distance   = r.IsDBNull(6)  ? null : r.GetDouble(6),
+        Calorie    = r.IsDBNull(7)  ? null : r.GetDouble(7),
+        AvgHr      = r.IsDBNull(8)  ? null : r.GetInt32(8),
+        MaxHr      = r.IsDBNull(9)  ? null : r.GetInt32(9),
+        MinHr      = r.IsDBNull(10) ? null : r.GetInt32(10),
+        AvgSpo2    = r.IsDBNull(11) ? null : r.GetInt32(11),
+        Sbp        = r.IsDBNull(12) ? null : r.GetInt32(12),
+        Dbp        = r.IsDBNull(13) ? null : r.GetInt32(13),
+        Fatigue    = r.IsDBNull(14) ? null : r.GetInt32(14),
+        CreatedAt  = r.GetDateTime(15)
+    };
+
     public void Dispose() { }
 }

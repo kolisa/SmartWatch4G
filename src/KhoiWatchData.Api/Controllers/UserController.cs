@@ -8,6 +8,8 @@ namespace KhoiWatchData.Api.Controllers;
 [Route("users")]
 public sealed class UserController : ControllerBase
 {
+    private const string DeviceIdRequired = "Device ID is required.";
+
     private readonly IUserService _userService;
 
     public UserController(IUserService userService)
@@ -39,7 +41,7 @@ public sealed class UserController : ControllerBase
     public async Task<IActionResult> GetUser(string deviceId)
     {
         if (string.IsNullOrWhiteSpace(deviceId))
-            return BadRequest(new { message = "Device ID is required." });
+            return BadRequest(new { message = DeviceIdRequired });
 
         var result = await _userService.GetByDeviceIdAsync(deviceId);
         if (result.IsFailure)
@@ -52,7 +54,7 @@ public sealed class UserController : ControllerBase
 
     /// <summary>Returns all active users. Optionally filter by company using ?companyId=X.</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAllUsers([FromQuery] int? companyId = null)
+    public async Task<IActionResult> GetUsers([FromQuery] int? companyId = null)
     {
         if (companyId.HasValue)
         {
@@ -74,7 +76,7 @@ public sealed class UserController : ControllerBase
     public async Task<IActionResult> UpdateUser(string deviceId, [FromBody] UpdateUserRequest request)
     {
         if (string.IsNullOrWhiteSpace(deviceId))
-            return BadRequest(new { message = "Device ID is required." });
+            return BadRequest(new { message = DeviceIdRequired });
 
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
@@ -95,7 +97,7 @@ public sealed class UserController : ControllerBase
     public async Task<IActionResult> DeleteUser(string deviceId)
     {
         if (string.IsNullOrWhiteSpace(deviceId))
-            return BadRequest(new { message = "Device ID is required." });
+            return BadRequest(new { message = DeviceIdRequired });
 
         var result = await _userService.DeleteAsync(deviceId);
         if (result.IsFailure)
@@ -114,7 +116,7 @@ public sealed class UserController : ControllerBase
     public async Task<IActionResult> LinkToCompany(string deviceId, [FromBody] LinkUserToCompanyRequest request)
     {
         if (string.IsNullOrWhiteSpace(deviceId))
-            return BadRequest(new { message = "Device ID is required." });
+            return BadRequest(new { message = DeviceIdRequired });
 
         var result = await _userService.LinkToCompanyAsync(deviceId, request.CompanyId);
         if (result.IsFailure)
@@ -137,7 +139,7 @@ public sealed class UserController : ControllerBase
     public async Task<IActionResult> BackfillRecords(string deviceId)
     {
         if (string.IsNullOrWhiteSpace(deviceId))
-            return BadRequest(new { message = "Device ID is required." });
+            return BadRequest(new { message = DeviceIdRequired });
 
         var result = await _userService.BackfillDeviceRecordsAsync(deviceId);
         if (result.IsFailure)
@@ -155,7 +157,7 @@ public sealed class UserController : ControllerBase
     public async Task<IActionResult> ReactivateUser(string deviceId)
     {
         if (string.IsNullOrWhiteSpace(deviceId))
-            return BadRequest(new { message = "Device ID is required." });
+            return BadRequest(new { message = DeviceIdRequired });
 
         var result = await _userService.ReactivateAsync(deviceId);
         if (result.IsFailure)

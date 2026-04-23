@@ -17,7 +17,7 @@ public sealed class AlertQueryService : IAlertQueryService
         _logger = logger;
     }
 
-    public Task<ServiceResult<IReadOnlyList<AlarmSummaryResponse>>> GetRecentAlarmsAsync(
+    public Task<ServiceResult<IReadOnlyList<AlertSummaryResponse>>> GetRecentAlertsAsync(
         int withinHours = 24, int limit = 50)
     {
         if (withinHours < 1)   withinHours = 1;
@@ -27,11 +27,10 @@ public sealed class AlertQueryService : IAlertQueryService
 
         try
         {
-            // GetRecentAlarms now JOINs user_profiles — no second query needed
             var alarms = _db.GetRecentAlarms(withinHours, limit);
 
-            IReadOnlyList<AlarmSummaryResponse> result = alarms
-                .Select(a => new AlarmSummaryResponse
+            IReadOnlyList<AlertSummaryResponse> result = alarms
+                .Select(a => new AlertSummaryResponse
                 {
                     Id         = a.Id,
                     DeviceId   = a.DeviceId,
@@ -43,34 +42,13 @@ public sealed class AlertQueryService : IAlertQueryService
                 })
                 .ToList();
 
-            return Task.FromResult(ServiceResult<IReadOnlyList<AlarmSummaryResponse>>.Ok(result));
+            return Task.FromResult(ServiceResult<IReadOnlyList<AlertSummaryResponse>>.Ok(result));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetRecentAlarmsAsync failed");
+            _logger.LogError(ex, "GetRecentAlertsAsync failed");
             return Task.FromResult(
-                ServiceResult<IReadOnlyList<AlarmSummaryResponse>>.Fail("An unexpected error occurred.", 500));
-        }
-    }
-
-    public Task<ServiceResult<FleetStatusResponse>> GetFleetStatusAsync()
-    {
-        try
-        {
-            var (workers, alarms, sos) = _db.GetDashboardCounts(24);
-
-            return Task.FromResult(ServiceResult<FleetStatusResponse>.Ok(new FleetStatusResponse
-            {
-                TotalWorkers = workers,
-                ActiveAlerts = alarms,
-                SosCount     = sos
-            }));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "GetFleetStatusAsync failed");
-            return Task.FromResult(
-                ServiceResult<FleetStatusResponse>.Fail("An unexpected error occurred.", 500));
+                ServiceResult<IReadOnlyList<AlertSummaryResponse>>.Fail("An unexpected error occurred.", 500));
         }
     }
 }

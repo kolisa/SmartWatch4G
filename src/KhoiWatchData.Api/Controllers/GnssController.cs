@@ -7,11 +7,11 @@ namespace KhoiWatchData.Api.Controllers;
 [Route("gnss")]
 public sealed class GnssController : ControllerBase
 {
-    private readonly ITrackingQueryService _trackingService;
+    private readonly IGnssQueryService _gnssService;
 
-    public GnssController(ITrackingQueryService trackingService)
+    public GnssController(IGnssQueryService gnssService)
     {
-        _trackingService = trackingService;
+        _gnssService = gnssService;
     }
 
     /// <summary>
@@ -20,9 +20,9 @@ public sealed class GnssController : ControllerBase
     /// Devices that are offline or have no tracking data are excluded.
     /// </summary>
     [HttpGet("online-users")]
-    public async Task<IActionResult> GetOnlineUsersWithTracking()
+    public async Task<IActionResult> GetOnlineDevices()
     {
-        var result = await _trackingService.GetOnlineUsersWithTrackingAsync();
+        var result = await _gnssService.GetOnlineUsersWithTrackingAsync();
         if (result.IsFailure)
             return StatusCode(500, new { message = result.Error });
 
@@ -37,7 +37,7 @@ public sealed class GnssController : ControllerBase
     /// <param name="deviceId">The device identifier to query.</param>
     /// <param name="from">Optional start of date range (inclusive, UTC).</param>
     /// <param name="to">Optional end of date range (inclusive, UTC).</param>
-    [HttpGet("history/{deviceId}")]
+    [HttpGet("{deviceId}/history")]
     public async Task<IActionResult> GetTrackHistory(
         string deviceId,
         [FromQuery] System.DateTime? from = null,
@@ -49,7 +49,7 @@ public sealed class GnssController : ControllerBase
         if (from.HasValue && to.HasValue && from.Value > to.Value)
             return BadRequest(new { message = "'from' must be earlier than or equal to 'to'." });
 
-        var result = await _trackingService.GetTrackHistoryAsync(deviceId, from, to);
+        var result = await _gnssService.GetTrackHistoryAsync(deviceId, from, to);
         if (result.IsFailure)
             return StatusCode(500, new { message = result.Error });
 

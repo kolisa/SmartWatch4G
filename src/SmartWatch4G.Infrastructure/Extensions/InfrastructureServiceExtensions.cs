@@ -24,10 +24,13 @@ public static class InfrastructureServiceExtensions
         // ── Application services ──────────────────────────────────────────────
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICompanyService, CompanyService>();
-        services.AddScoped<ITrackingQueryService, TrackingQueryService>();
-        services.AddScoped<IWorkerQueryService, WorkerQueryService>();
+        services.AddScoped<IGnssQueryService, GnssQueryService>();
+        services.AddScoped<IUserProfileQueryService, UserProfileQueryService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IAlertQueryService, AlertQueryService>();
+        services.AddScoped<IGpsQueryService, GpsQueryService>();
+        services.AddScoped<IHealthQueryService, HealthQueryService>();
+        services.AddScoped<IDeviceConfigQueryService, DeviceConfigQueryService>();
 
         // ── Processors ────────────────────────────────────────────────────────
         services.AddSingleton<OldManProcessor>();

@@ -7,13 +7,13 @@ using SmartWatch4G.Domain.Interfaces;
 
 namespace SmartWatch4G.Infrastructure.Services;
 
-public sealed class TrackingQueryService : ITrackingQueryService
+public sealed class GnssQueryService : IGnssQueryService
 {
     private readonly IDatabaseService _db;
     private readonly IDeviceStatusCache _statusCache;
-    private readonly ILogger<TrackingQueryService> _logger;
+    private readonly ILogger<GnssQueryService> _logger;
 
-    public TrackingQueryService(IDatabaseService db, IDeviceStatusCache statusCache, ILogger<TrackingQueryService> logger)
+    public GnssQueryService(IDatabaseService db, IDeviceStatusCache statusCache, ILogger<GnssQueryService> logger)
     {
         _db          = db;
         _statusCache = statusCache;

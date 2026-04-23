@@ -44,7 +44,7 @@ public sealed class CompanyController : ControllerBase
 
     /// <summary>Returns all active companies.</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAllCompanies()
+    public async Task<IActionResult> GetCompanies()
     {
         var result = await _companyService.GetAllAsync();
         if (result.IsFailure)

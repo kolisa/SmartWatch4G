@@ -9,7 +9,7 @@ public sealed class PagedResult<T>
     public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
 }
 
-public sealed class WorkerSummaryResponse
+public sealed class UserProfileSummaryResponse
 {
     public string DeviceId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
@@ -28,7 +28,7 @@ public sealed class WorkerSummaryResponse
     public DateTime? HealthRecordedAt { get; init; }
 }
 
-public sealed class WorkerDetailResponse
+public sealed class UserProfileDetailResponse
 {
     public string DeviceId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
@@ -52,5 +52,26 @@ public sealed class WorkerDetailResponse
     public int? Dbp { get; init; }
     public double? Distance { get; init; }
     public double? Calorie { get; init; }
+    public DateTime? HealthRecordedAt { get; init; }
+}
+
+/// <summary>
+/// Lightweight operational snapshot for a single device.
+/// Designed for high-frequency polling in device-heavy integrations.
+/// </summary>
+public sealed class DeviceTelemetryResponse
+{
+    public string DeviceId { get; init; } = string.Empty;
+    public string DeviceStatus { get; init; } = "unknown";
+    public int? Battery { get; init; }
+    public int? HeartRate { get; init; }
+    public int? SpO2 { get; init; }
+    public int? Fatigue { get; init; }
+    public int? Sbp { get; init; }
+    public int? Dbp { get; init; }
+    public int? Steps { get; init; }
+    public double? Latitude { get; init; }
+    public double? Longitude { get; init; }
+    public string? GnssTime { get; init; }
     public DateTime? HealthRecordedAt { get; init; }
 }

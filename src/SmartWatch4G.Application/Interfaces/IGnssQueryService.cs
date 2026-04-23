@@ -3,7 +3,7 @@ using SmartWatch4G.Domain.Common;
 
 namespace SmartWatch4G.Application.Interfaces;
 
-public interface ITrackingQueryService
+public interface IGnssQueryService
 {
     Task<ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>> GetOnlineUsersWithTrackingAsync();
     Task<ServiceResult<UserTrackHistoryResponse>> GetTrackHistoryAsync(string deviceId, System.DateTime? from, System.DateTime? to);

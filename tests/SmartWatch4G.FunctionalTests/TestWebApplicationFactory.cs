@@ -85,5 +85,62 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         public IReadOnlyList<SmartWatch4G.Domain.Entities.AlarmEvent> GetRecentAlarms(int withinHours, int limit) => [];
         public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours) => (0, 0, 0);
         public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCountsByCompany(int withinHours, int companyId) => (0, 0, 0);
+
+        // GPS queries
+        public (IReadOnlyList<(string DeviceId, string? UserName, SmartWatch4G.Domain.Entities.GnssTrack Track)> Items, int TotalCount)
+            GetGnssTracksByCompany(int companyId, System.DateTime? from, System.DateTime? to,
+                int skip, int take, string sortDir, bool onlineOnly, bool offlineOnly) => ([], 0);
+        public (int Online, int Offline) GetDeviceStatusCountsByCompany(int companyId,
+            System.Collections.Generic.IReadOnlyList<string> onlineDeviceIds) => (0, 0);
+
+        // Health queries
+        public (IReadOnlyList<SmartWatch4G.Domain.Entities.HealthSnapshot> Items, int TotalCount)
+            GetHealthSnapshotsByDevice(string deviceId, System.DateTime? from, System.DateTime? to,
+                int skip, int take, string sortDir) => ([], 0);
+        public (IReadOnlyList<(string DeviceId, string? UserName, SmartWatch4G.Domain.Entities.HealthSnapshot Snapshot)> Items, int TotalCount)
+            GetHealthSnapshotsByCompany(int companyId, System.DateTime? from, System.DateTime? to,
+                int skip, int take, string sortDir) => ([], 0);
+        public IReadOnlyList<(string DeviceId, string? UserName, double? AvgHr, double? AvgSpo2,
+            double? AvgFatigue, int? MaxHr, int? MinHr, int? TotalSteps, int Count)>
+            GetHealthSummaryByCompany(int companyId, System.DateTime? from, System.DateTime? to) => [];
+
+        // Device config queries
+        public (string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+            bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
+            bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
+            bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
+            bool? DynHrAlarmOpen, int? DynHrAlarmHigh, int? DynHrAlarmLow, int? DynHrAlarmTimeout, int? DynHrAlarmInterval,
+            bool? Spo2AlarmOpen, int? Spo2AlarmLow,
+            bool? BpAlarmOpen, int? BpSbpHigh, int? BpSbpBelow, int? BpDbpHigh, int? BpDbpBelow,
+            bool? TempAlarmOpen, double? TempAlarmHigh, double? TempAlarmLow,
+            bool? FallCheckEnabled, int? FallThreshold,
+            string? Language, int? HourFormat, string? DateFormat, int? DistanceUnit, int? TemperatureUnit, bool? WearHandRight,
+            int? HrInterval, int? OtherInterval,
+            int? GoalStep, double? GoalDistance, double? GoalCalorie,
+            bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
+            bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
+            bool? AutoAfOpen, int? AutoAfInterval,
+            double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)?
+            GetDeviceConfig(string deviceId) => null;
+
+        public IReadOnlyList<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+            bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
+            bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
+            bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
+            bool? DynHrAlarmOpen, int? DynHrAlarmHigh, int? DynHrAlarmLow, int? DynHrAlarmTimeout, int? DynHrAlarmInterval,
+            bool? Spo2AlarmOpen, int? Spo2AlarmLow,
+            bool? BpAlarmOpen, int? BpSbpHigh, int? BpSbpBelow, int? BpDbpHigh, int? BpDbpBelow,
+            bool? TempAlarmOpen, double? TempAlarmHigh, double? TempAlarmLow,
+            bool? FallCheckEnabled, int? FallThreshold,
+            string? Language, int? HourFormat, string? DateFormat, int? DistanceUnit, int? TemperatureUnit, bool? WearHandRight,
+            int? HrInterval, int? OtherInterval,
+            int? GoalStep, double? GoalDistance, double? GoalCalorie,
+            bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
+            bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
+            bool? AutoAfOpen, int? AutoAfInterval,
+            double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)>
+            GetDeviceConfigsByCompany(int companyId, int skip, int take) => [];
+
+        public int GetDeviceConfigCountByCompany(int companyId) => 0;
     }
 }
