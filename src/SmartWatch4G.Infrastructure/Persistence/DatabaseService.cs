@@ -583,6 +583,93 @@ END
 ";
             using (var idxCmd = new SqlCommand(indexDdl, conn))
                 idxCmd.ExecuteNonQuery();
+
+            // ── Seed default settings for known devices ───────────────────────
+            // Idempotent: INSERT WHERE NOT EXISTS — safe to run on every startup.
+            // device_data_freq and device_gps_settings are intentionally excluded:
+            // those rows are only created by DeviceProvisioningService after the
+            // Iwown API confirms success (ReturnCode == 0).
+            var seedSql = @"
+DECLARE @devices TABLE (device_id NVARCHAR(50));
+INSERT INTO @devices VALUES
+    ('863758060986873'),('863758060926292'),('863758060956587'),
+    ('863758060926754'),('863758060987517'),('863758060987855'),
+    ('863758060927422'),('863758060926499'),('863758060927455'),
+    ('863758060982484'),('863758060926564'),('863758060987483'),
+    ('863758060927232');
+
+INSERT INTO device_locate_freq (device_id,data_auto_upload,data_upload_interval,auto_locate,locate_interval_time,power_mode,user_id,company_id)
+SELECT d.device_id,1,300,1,60,2,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_locate_freq t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_hr_alarm (device_id,open,high,low,threshold,alarm_interval,user_id,company_id)
+SELECT d.device_id,1,160,45,5,5,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_hr_alarm t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_dynamic_hr_alarm (device_id,open,high,low,timeout,interval,user_id,company_id)
+SELECT d.device_id,0,160,45,30,5,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_dynamic_hr_alarm t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_spo2_alarm (device_id,open,low,user_id,company_id)
+SELECT d.device_id,1,90,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_spo2_alarm t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_bp_alarm (device_id,open,sbp_high,sbp_below,dbp_high,dbp_below,user_id,company_id)
+SELECT d.device_id,0,160,90,100,60,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_bp_alarm t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_temp_alarm (device_id,open,high,low,user_id,company_id)
+SELECT d.device_id,0,39,35,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_temp_alarm t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_fall_settings (device_id,fall_check,fall_threshold,user_id,company_id)
+SELECT d.device_id,1,3,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_fall_settings t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_hr_interval (device_id,interval,user_id,company_id)
+SELECT d.device_id,5,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_hr_interval t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_other_interval (device_id,interval,user_id,company_id)
+SELECT d.device_id,10,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_other_interval t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_goal (device_id,step,distance,calorie,user_id,company_id)
+SELECT d.device_id,10000,5,400,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_goal t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_display (device_id,language,hour_format,date_format,distance_unit,temperature_unit,wear_hand_right,user_id,company_id)
+SELECT d.device_id,0,24,0,0,0,0,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_display t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_auto_af (device_id,open,interval,rri_single_time,rri_type,user_id,company_id)
+SELECT d.device_id,0,60,0,0,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_auto_af t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_user_info (device_id,user_id,company_id)
+SELECT d.device_id,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_user_info t WHERE t.device_id=d.device_id);
+
+INSERT INTO device_bp_adjust (device_id,user_id,company_id)
+SELECT d.device_id,u.user_id,1 FROM @devices d
+LEFT JOIN user_profiles u ON u.device_id=d.device_id
+WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id);
+";
+            using (var seedCmd = new SqlCommand(seedSql, conn))
+                seedCmd.ExecuteNonQuery();
         }
         catch (Exception ex)
         {
