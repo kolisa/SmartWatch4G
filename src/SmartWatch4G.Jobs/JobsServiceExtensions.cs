@@ -45,7 +45,6 @@ public static class JobsServiceExtensions
                 .WithSimpleSchedule(x => x
                     .WithIntervalInSeconds(pollingIntervalSeconds)
                     .RepeatForever()));
-        });
 
             // ── Device provisioning job (3× daily: 06:00, 12:00, 18:00) ─────────────────
             var provisionJobKey = new JobKey("DeviceProvisioningJob");
