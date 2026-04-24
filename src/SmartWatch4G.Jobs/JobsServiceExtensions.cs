@@ -47,6 +47,17 @@ public static class JobsServiceExtensions
                     .RepeatForever()));
         });
 
+            // ── Device provisioning job (3× daily: 06:00, 12:00, 18:00) ─────────────────
+            var provisionJobKey = new JobKey("DeviceProvisioningJob");
+
+            q.AddJob<DeviceProvisioningJob>(opts => opts.WithIdentity(provisionJobKey));
+
+            q.AddTrigger(opts => opts
+                .ForJob(provisionJobKey)
+                .WithIdentity("DeviceProvisioningJob-trigger")
+                .WithCronSchedule("0 0 6,12,18 * * ?"));
+        });
+
         services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
         return services;

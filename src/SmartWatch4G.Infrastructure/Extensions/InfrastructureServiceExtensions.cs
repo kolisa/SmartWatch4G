@@ -56,6 +56,9 @@ public static class InfrastructureServiceExtensions
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
+        // ── Device provisioning service ───────────────────────────────────────
+        services.AddScoped<IDeviceProvisioningService, DeviceProvisioningService>();
+
         return services;
     }
 }
