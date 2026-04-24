@@ -55,8 +55,6 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     private void InitializeSchema()
     {
-        EnsureDatabase();
-
         try
         {
             using var conn = Open();
