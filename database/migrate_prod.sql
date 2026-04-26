@@ -290,7 +290,28 @@ END
 GO
 
 -- =============================================================================
--- 5. Verification: show every table + column count + new columns present
+-- 5. NEW TABLE: audit_log
+--    Tracks every INSERT/UPDATE/UPSERT operation for debugging.
+-- =============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'audit_log')
+CREATE TABLE audit_log (
+    id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+    action      NVARCHAR(20)   NOT NULL,
+    table_name  NVARCHAR(100)  NOT NULL,
+    device_id   NVARCHAR(50)   NULL,
+    details     NVARCHAR(500)  NULL,
+    occurred_at DATETIME2      NOT NULL DEFAULT GETDATE()
+);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_audit_occurred'
+               AND object_id=OBJECT_ID('audit_log'))
+    CREATE INDEX IX_audit_occurred ON audit_log (occurred_at DESC)
+        INCLUDE (action, table_name, device_id);
+GO
+
+-- =============================================================================
+-- 6. Verification: show every table + column count + new columns present
 -- =============================================================================
 SELECT
     t.name                                              AS table_name,

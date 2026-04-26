@@ -728,7 +728,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         {
             await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
-                MERGE health_snapshots AS t
+                MERGE health_snapshots WITH (HOLDLOCK) AS t
                 USING (
                     SELECT @dev AS device_id, @rt AS record_time, u.user_id, u.company_id
                     FROM (VALUES(1)) AS x(dummy)
@@ -1843,7 +1843,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                     r.IsDBNull(4) ? null : r.GetDouble(4),
                     r.IsDBNull(5) ? null : r.GetInt32(5),
                     r.IsDBNull(6) ? null : r.GetInt32(6),
-                    r.IsDBNull(7) ? null : (int?)r.GetInt64(7),
+                    r.IsDBNull(7) ? null : (int?)Math.Min(r.GetInt64(7), int.MaxValue),
                     r.GetInt32(8)
                 ));
             }
