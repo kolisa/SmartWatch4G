@@ -13,12 +13,15 @@ public sealed class GpsQueryService : IGpsQueryService
 
     private readonly IDatabaseService    _db;
     private readonly IDeviceStatusCache  _statusCache;
+    private readonly IwownService        _iwown;
     private readonly ILogger<GpsQueryService> _logger;
 
-    public GpsQueryService(IDatabaseService db, IDeviceStatusCache statusCache, ILogger<GpsQueryService> logger)
+    public GpsQueryService(IDatabaseService db, IDeviceStatusCache statusCache,
+        IwownService iwown, ILogger<GpsQueryService> logger)
     {
         _db          = db;
         _statusCache = statusCache;
+        _iwown       = iwown;
         _logger      = logger;
     }
 
@@ -140,13 +143,18 @@ public sealed class GpsQueryService : IGpsQueryService
     {
         try
         {
+            // All three run in parallel: real-time Iwown status + latest GPS + user profile
+            var statusTask  = _iwown.GetDeviceStatusAsync(deviceId);
             var trackTask   = _db.GetLatestGnssTrack(deviceId);
             var profileTask = _db.GetUserProfile(deviceId);
-            await Task.WhenAll(trackTask, profileTask);
+            await Task.WhenAll(statusTask, trackTask, profileTask);
+
+            var isOnline = DeviceStatusParser.IsOnline(statusTask.Result);
+            // Keep the polling cache in sync so dashboard queries stay consistent
+            _statusCache.SetStatus(deviceId, isOnline);
 
             var track   = trackTask.Result;
             var profile = profileTask.Result;
-            var isOnline = _statusCache.IsOnline(deviceId);
 
             return ServiceResult<DeviceGpsStatusResponse>.Ok(new DeviceGpsStatusResponse
             {
