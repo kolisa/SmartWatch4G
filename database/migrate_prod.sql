@@ -454,15 +454,78 @@ END
 GO
 
 -- =============================================================================
--- 7. Verification: show every table + column count + new columns present
+-- 7. BACKFILL: populate user_id / company_id on all records via user_profiles
+--    user_profiles is the source of truth: device_id → user_id + company_id.
+--    Only updates rows where either value is NULL so existing links are kept.
+--    Safe to re-run.
+-- =============================================================================
+
+-- Step 1: ensure user_profiles itself has company_id set.
+--         All known devices belong to company 1 (id=1 must exist in companies).
+UPDATE user_profiles
+SET company_id = 1
+WHERE company_id IS NULL
+  AND is_active = 1
+  AND EXISTS (SELECT 1 FROM companies WHERE id = 1);
+
+PRINT N'user_profiles: ' + CAST(@@ROWCOUNT AS NVARCHAR(10)) + N' rows linked to company 1';
+GO
+
+-- Step 2: propagate user_id + company_id from user_profiles to every table
+--         that has device_id, user_id, and company_id columns.
+DECLARE @tbls NVARCHAR(MAX) =
+    'gps_tracks,health_snapshots,alarms,sos_events,device_info_log,' +
+    'device_data_freq,device_locate_freq,device_gps_settings,' +
+    'device_hr_alarm,device_dynamic_hr_alarm,device_spo2_alarm,' +
+    'device_bp_alarm,device_temp_alarm,device_fall_settings,' +
+    'device_hr_interval,device_other_interval,device_goal,device_display,' +
+    'device_auto_af,device_bp_adjust,device_user_info,device_lcd_gesture,' +
+    'device_phonebook,device_clock_alarms,device_sedentary,' +
+    'sleep_calculations,ecg_calculations,af_calculations,spo2_calculations';
+
+DECLARE @t NVARCHAR(200), @p INT, @sql NVARCHAR(MAX), @rows INT;
+WHILE LEN(@tbls) > 0
+BEGIN
+    SET @p    = CHARINDEX(',', @tbls);
+    IF @p = 0 SET @p = LEN(@tbls) + 1;
+    SET @t    = LEFT(@tbls, @p - 1);
+    SET @tbls = SUBSTRING(@tbls, @p + 1, LEN(@tbls));
+
+    IF OBJECT_ID(@t, 'U') IS NOT NULL
+       AND COL_LENGTH(@t, 'device_id')   IS NOT NULL
+       AND COL_LENGTH(@t, 'user_id')     IS NOT NULL
+       AND COL_LENGTH(@t, 'company_id')  IS NOT NULL
+    BEGIN
+        SET @sql = N'
+            UPDATE tbl
+            SET tbl.user_id    = u.user_id,
+                tbl.company_id = u.company_id
+            FROM ' + QUOTENAME(@t) + N' tbl
+            INNER JOIN user_profiles u
+                ON  u.device_id  = tbl.device_id
+                AND u.is_active  = 1
+            WHERE tbl.company_id IS NULL
+               OR tbl.user_id   IS NULL;
+            SELECT @r = @@ROWCOUNT;';
+        SET @rows = 0;
+        EXEC sp_executesql @sql, N'@r INT OUTPUT', @r = @rows OUTPUT;
+        IF @rows > 0
+            PRINT N'  ' + @t + N': ' + CAST(@rows AS NVARCHAR(10)) + N' rows updated';
+    END
+END
+GO
+
+-- =============================================================================
+-- 8. Verification: row counts and link coverage per table
 -- =============================================================================
 SELECT
-    t.name                                              AS table_name,
-    COUNT(c.column_id)                                  AS column_count,
-    MAX(CASE WHEN c.name = 'user_id'    THEN 'Y' END)  AS has_user_id,
-    MAX(CASE WHEN c.name = 'company_id' THEN 'Y' END)  AS has_company_id
+    t.name                                                          AS table_name,
+    SUM(p.rows)                                                     AS total_rows,
+    MAX(CASE WHEN c.name = 'user_id'    THEN 'Y' ELSE 'N' END)     AS has_user_id_col,
+    MAX(CASE WHEN c.name = 'company_id' THEN 'Y' ELSE 'N' END)     AS has_company_id_col
 FROM sys.tables t
-JOIN sys.columns c ON c.object_id = t.object_id
+JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0,1)
+JOIN sys.columns c    ON c.object_id = t.object_id
 WHERE t.type = 'U'
 GROUP BY t.name
 ORDER BY t.name;
