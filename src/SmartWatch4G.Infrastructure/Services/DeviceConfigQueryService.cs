@@ -19,7 +19,7 @@ public sealed class DeviceConfigQueryService : IDeviceConfigQueryService
         _logger = logger;
     }
 
-    public Task<ServiceResult<DeviceConfigPagedResult>> GetByCompanyAsync(int companyId, int page, int pageSize)
+    public async Task<ServiceResult<DeviceConfigPagedResult>> GetByCompanyAsync(int companyId, int page, int pageSize)
     {
         try
         {
@@ -27,8 +27,8 @@ public sealed class DeviceConfigQueryService : IDeviceConfigQueryService
             pageSize = Math.Clamp(pageSize, 1, 100);
             var skip  = (page - 1) * pageSize;
 
-            var total = _db.GetDeviceConfigCountByCompany(companyId);
-            var rows  = _db.GetDeviceConfigsByCompany(companyId, skip, pageSize);
+            var total = await _db.GetDeviceConfigCountByCompany(companyId);
+            var rows  = await _db.GetDeviceConfigsByCompany(companyId, skip, pageSize);
 
             var result = new DeviceConfigPagedResult
             {
@@ -37,30 +37,29 @@ public sealed class DeviceConfigQueryService : IDeviceConfigQueryService
                 Page       = page,
                 PageSize   = pageSize
             };
-            return Task.FromResult(ServiceResult<DeviceConfigPagedResult>.Ok(result));
+            return ServiceResult<DeviceConfigPagedResult>.Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "DeviceConfigQueryService.GetByCompanyAsync failed for company {Id}", companyId);
-            return Task.FromResult(ServiceResult<DeviceConfigPagedResult>.Fail(UnexpectedError, 500));
+            return ServiceResult<DeviceConfigPagedResult>.Fail(UnexpectedError, 500);
         }
     }
 
-    public Task<ServiceResult<DeviceConfigResponse>> GetByDeviceAsync(string deviceId)
+    public async Task<ServiceResult<DeviceConfigResponse>> GetByDeviceAsync(string deviceId)
     {
         try
         {
-            var row = _db.GetDeviceConfig(deviceId);
+            var row = await _db.GetDeviceConfig(deviceId);
             if (row is null)
-                return Task.FromResult(
-                    ServiceResult<DeviceConfigResponse>.Fail("No configuration found for this device.", 404));
+                return ServiceResult<DeviceConfigResponse>.Fail("No configuration found for this device.", 404);
 
-            return Task.FromResult(ServiceResult<DeviceConfigResponse>.Ok(MapConfig(row.Value)));
+            return ServiceResult<DeviceConfigResponse>.Ok(MapConfig(row.Value));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "DeviceConfigQueryService.GetByDeviceAsync failed for {Device}", deviceId);
-            return Task.FromResult(ServiceResult<DeviceConfigResponse>.Fail(UnexpectedError, 500));
+            return ServiceResult<DeviceConfigResponse>.Fail(UnexpectedError, 500);
         }
     }
 

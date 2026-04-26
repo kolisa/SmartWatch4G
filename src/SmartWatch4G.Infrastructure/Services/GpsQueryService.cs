@@ -4,7 +4,6 @@ using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces;
-using SysDateTime = System.DateTime;
 
 namespace SmartWatch4G.Infrastructure.Services;
 
@@ -23,67 +22,66 @@ public sealed class GpsQueryService : IGpsQueryService
         _logger      = logger;
     }
 
-    public Task<ServiceResult<GpsPagedResult>> GetByCompanyAsync(int companyId, GpsQueryParams q)
+    public async Task<ServiceResult<GpsPagedResult>> GetByCompanyAsync(int companyId, GpsQueryParams q)
     {
         try
         {
             ValidateDateRange(q.From, q.To, out var err);
-            if (err is not null) return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(err, 400));
+            if (err is not null) return ServiceResult<GpsPagedResult>.Fail(err, 400);
 
             var (skip, take) = Paging(q);
-            var (items, totalCount) = _db.GetGnssTracksByCompany(
+            var (items, totalCount) = await _db.GetGnssTracksByCompany(
                 companyId, q.From, q.To, skip, take, q.SortDir,
                 onlineOnly: false, offlineOnly: false);
 
             var onlineIds = _statusCache.GetAllDeviceIds().Where(_statusCache.IsOnline).ToList();
-            var (online, offline) = _db.GetDeviceStatusCountsByCompany(companyId, onlineIds);
+            var (online, offline) = await _db.GetDeviceStatusCountsByCompany(companyId, onlineIds);
 
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Ok(Build(items, totalCount, q, online, offline)));
+            return ServiceResult<GpsPagedResult>.Ok(Build(items, totalCount, q, online, offline));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GpsQueryService.GetByCompanyAsync failed for company {Id}", companyId);
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500));
+            return ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500);
         }
     }
 
-    public Task<ServiceResult<GpsPagedResult>> GetOnlineByCompanyAsync(int companyId, GpsQueryParams q)
+    public async Task<ServiceResult<GpsPagedResult>> GetOnlineByCompanyAsync(int companyId, GpsQueryParams q)
     {
         try
         {
             ValidateDateRange(q.From, q.To, out var err);
-            if (err is not null) return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(err, 400));
+            if (err is not null) return ServiceResult<GpsPagedResult>.Fail(err, 400);
 
             var (skip, take) = Paging(q);
-            var (items, _) = _db.GetGnssTracksByCompany(
+            var (items, _) = await _db.GetGnssTracksByCompany(
                 companyId, q.From, q.To, skip, take, q.SortDir,
                 onlineOnly: true, offlineOnly: false);
 
-            // filter to online devices using cache
             var onlineIds = new HashSet<string>(_statusCache.GetAllDeviceIds().Where(_statusCache.IsOnline),
                 StringComparer.OrdinalIgnoreCase);
             var filtered = items.Where(x => onlineIds.Contains(x.DeviceId)).ToList();
 
-            var (online, offline) = _db.GetDeviceStatusCountsByCompany(companyId, onlineIds.ToList());
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Ok(
-                Build(filtered, filtered.Count, q, online, offline)));
+            var (online, offline) = await _db.GetDeviceStatusCountsByCompany(companyId, onlineIds.ToList());
+            return ServiceResult<GpsPagedResult>.Ok(
+                Build(filtered, filtered.Count, q, online, offline));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GpsQueryService.GetOnlineByCompanyAsync failed for company {Id}", companyId);
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500));
+            return ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500);
         }
     }
 
-    public Task<ServiceResult<GpsPagedResult>> GetOfflineByCompanyAsync(int companyId, GpsQueryParams q)
+    public async Task<ServiceResult<GpsPagedResult>> GetOfflineByCompanyAsync(int companyId, GpsQueryParams q)
     {
         try
         {
             ValidateDateRange(q.From, q.To, out var err);
-            if (err is not null) return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(err, 400));
+            if (err is not null) return ServiceResult<GpsPagedResult>.Fail(err, 400);
 
             var (skip, take) = Paging(q);
-            var (items, _) = _db.GetGnssTracksByCompany(
+            var (items, _) = await _db.GetGnssTracksByCompany(
                 companyId, q.From, q.To, skip, take, q.SortDir,
                 onlineOnly: false, offlineOnly: true);
 
@@ -91,27 +89,26 @@ public sealed class GpsQueryService : IGpsQueryService
                 StringComparer.OrdinalIgnoreCase);
             var filtered = items.Where(x => !onlineIds.Contains(x.DeviceId)).ToList();
 
-            var (online, offline) = _db.GetDeviceStatusCountsByCompany(companyId, onlineIds.ToList());
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Ok(
-                Build(filtered, filtered.Count, q, online, offline)));
+            var (online, offline) = await _db.GetDeviceStatusCountsByCompany(companyId, onlineIds.ToList());
+            return ServiceResult<GpsPagedResult>.Ok(
+                Build(filtered, filtered.Count, q, online, offline));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GpsQueryService.GetOfflineByCompanyAsync failed for company {Id}", companyId);
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500));
+            return ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500);
         }
     }
 
-    public Task<ServiceResult<GpsPagedResult>> GetByDeviceAsync(string deviceId, GpsQueryParams q)
+    public async Task<ServiceResult<GpsPagedResult>> GetByDeviceAsync(string deviceId, GpsQueryParams q)
     {
         try
         {
             ValidateDateRange(q.From, q.To, out var err);
-            if (err is not null) return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(err, 400));
+            if (err is not null) return ServiceResult<GpsPagedResult>.Fail(err, 400);
 
-            var tracks = _db.GetGnssTracks(deviceId, q.From, q.To);
+            var tracks = await _db.GetGnssTracks(deviceId, q.From, q.To);
 
-            // Sort in memory (single-device queries are typically small)
             var sorted = string.Equals(q.SortDir, "asc", StringComparison.OrdinalIgnoreCase)
                 ? tracks.OrderBy(t => t.CreatedAt).ToList()
                 : tracks.OrderByDescending(t => t.CreatedAt).ToList();
@@ -120,10 +117,9 @@ public sealed class GpsQueryService : IGpsQueryService
             var (skip, take) = Paging(q);
             var page = sorted.Skip(skip).Take(take).ToList();
 
-            var mapped = page.Select(t => MapTrack(deviceId, null, t)).ToList();
             var result = new GpsPagedResult
             {
-                Items        = mapped,
+                Items        = page.Select(t => MapTrack(deviceId, null, t)).ToList(),
                 TotalCount   = total,
                 Page         = q.Page,
                 PageSize     = q.PageSize,
@@ -131,12 +127,12 @@ public sealed class GpsQueryService : IGpsQueryService
                 OfflineCount = _statusCache.IsOnline(deviceId) ? 0 : 1
             };
 
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Ok(result));
+            return ServiceResult<GpsPagedResult>.Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GpsQueryService.GetByDeviceAsync failed for {Device}", deviceId);
-            return Task.FromResult(ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500));
+            return ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500);
         }
     }
 

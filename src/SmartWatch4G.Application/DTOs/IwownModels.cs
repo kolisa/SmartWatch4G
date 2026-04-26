@@ -4,6 +4,20 @@ public class IwownResponse
 {
     public int ReturnCode { get; set; }
     public object? Data { get; set; }
+
+    // ReturnCode=0 is required, but Data.Success=false can still indicate the device rejected the command.
+    public bool Succeeded
+    {
+        get
+        {
+            if (ReturnCode != 0) return false;
+            if (Data is System.Text.Json.JsonElement el &&
+                el.TryGetProperty("Success", out var s) &&
+                s.ValueKind == System.Text.Json.JsonValueKind.False)
+                return false;
+            return true;
+        }
+    }
 }
 
 public class DeviceIdRequest
@@ -282,6 +296,7 @@ public class SleepRespiratoryStats
 public class SleepCalculationResponse
 {
     public int ReturnCode { get; set; }
+    public bool? Success { get; set; }
     public string? message { get; set; }
     public int completed { get; set; }
     public string? start_time { get; set; }
@@ -303,6 +318,7 @@ public class EcgCalculationRequest
 public class EcgCalculationResponse
 {
     public int ReturnCode { get; set; }
+    public bool? Success { get; set; }
     public string? message { get; set; }
     public int result { get; set; }
     public int hr { get; set; }
@@ -321,6 +337,7 @@ public class AfCalculationRequest
 public class AfCalculationResponse
 {
     public int ReturnCode { get; set; }
+    public bool? Success { get; set; }
     public string? message { get; set; }
     public int result { get; set; }
 }
@@ -336,6 +353,7 @@ public class Spo2CalculationRequest
 public class Spo2CalculationResponse
 {
     public int ReturnCode { get; set; }
+    public bool? Success { get; set; }
     public string? message { get; set; }
     public double spo2_score { get; set; }
     public int? osahs_risk { get; set; }

@@ -17,17 +17,17 @@ public sealed class AlertQueryService : IAlertQueryService
         _logger = logger;
     }
 
-    public Task<ServiceResult<IReadOnlyList<AlertSummaryResponse>>> GetRecentAlertsAsync(
+    public async Task<ServiceResult<IReadOnlyList<AlertSummaryResponse>>> GetRecentAlertsAsync(
         int withinHours = 24, int limit = 50)
     {
         if (withinHours < 1)   withinHours = 1;
-        if (withinHours > 720) withinHours = 720; // cap at 30 days
+        if (withinHours > 720) withinHours = 720;
         if (limit < 1)   limit = 1;
         if (limit > 500) limit = 500;
 
         try
         {
-            var alarms = _db.GetRecentAlarms(withinHours, limit);
+            var alarms = await _db.GetRecentAlarms(withinHours, limit);
 
             IReadOnlyList<AlertSummaryResponse> result = alarms
                 .Select(a => new AlertSummaryResponse
@@ -42,13 +42,12 @@ public sealed class AlertQueryService : IAlertQueryService
                 })
                 .ToList();
 
-            return Task.FromResult(ServiceResult<IReadOnlyList<AlertSummaryResponse>>.Ok(result));
+            return ServiceResult<IReadOnlyList<AlertSummaryResponse>>.Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetRecentAlertsAsync failed");
-            return Task.FromResult(
-                ServiceResult<IReadOnlyList<AlertSummaryResponse>>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<IReadOnlyList<AlertSummaryResponse>>.Fail("An unexpected error occurred.", 500);
         }
     }
 }

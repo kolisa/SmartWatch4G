@@ -24,32 +24,31 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
 
     public async Task<ServiceResult<PagedResult<UserProfileSummaryResponse>>> GetPagedUserProfilesAsync(int page, int pageSize, int? companyId = null)
     {
-        if (page < 1)    page     = 1;
+        if (page < 1)     page     = 1;
         if (pageSize < 1) pageSize = 10;
         if (pageSize > 100) pageSize = 100;
 
         try
         {
-            var skip    = (page - 1) * pageSize;
+            var skip = (page - 1) * pageSize;
             int total;
-            IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfile> workers;
+            IReadOnlyList<UserProfile> workers;
 
             if (companyId.HasValue)
             {
-                total   = _db.GetActiveWorkerCountByCompany(companyId.Value);
-                workers = _db.GetPagedUserProfilesByCompany(skip, pageSize, companyId.Value);
+                total   = await _db.GetActiveWorkerCountByCompany(companyId.Value);
+                workers = await _db.GetPagedUserProfilesByCompany(skip, pageSize, companyId.Value);
             }
             else
             {
-                total   = _db.GetActiveWorkerCount();
-                workers = _db.GetPagedUserProfiles(skip, pageSize);
+                total   = await _db.GetActiveWorkerCount();
+                workers = await _db.GetPagedUserProfiles(skip, pageSize);
             }
 
-            // Parallel fetch of latest health + GPS for each user profile on this page
             var tasks = workers.Select(async w =>
             {
-                var health = await Task.Run(() => _db.GetLatestHealthSnapshot(w.DeviceId));
-                var track  = await Task.Run(() => _db.GetLatestGnssTrack(w.DeviceId));
+                var health = await _db.GetLatestHealthSnapshot(w.DeviceId);
+                var track  = await _db.GetLatestGnssTrack(w.DeviceId);
                 return MapSummary(w, health, track);
             });
 
@@ -74,12 +73,12 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
     {
         try
         {
-            var profile = _db.GetUserProfile(deviceId);
+            var profile = await _db.GetUserProfile(deviceId);
             if (profile is null)
                 return ServiceResult<UserProfileDetailResponse>.Fail("User profile not found.", 404);
 
-            var healthTask = Task.Run(() => _db.GetLatestHealthSnapshot(deviceId));
-            var trackTask  = Task.Run(() => _db.GetLatestGnssTrack(deviceId));
+            var healthTask = _db.GetLatestHealthSnapshot(deviceId);
+            var trackTask  = _db.GetLatestGnssTrack(deviceId);
 
             await Task.WhenAll(healthTask, trackTask);
 
@@ -145,18 +144,16 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
     {
         try
         {
-            var profile = _db.GetUserProfile(deviceId);
+            var profile = await _db.GetUserProfile(deviceId);
             if (profile is null)
                 return ServiceResult<DeviceTelemetryResponse>.Fail("Device not found.", 404);
 
-            var healthTask = Task.Run(() => _db.GetLatestHealthSnapshot(deviceId));
-            var trackTask  = Task.Run(() => _db.GetLatestGnssTrack(deviceId));
+            var healthTask = _db.GetLatestHealthSnapshot(deviceId);
+            var trackTask  = _db.GetLatestGnssTrack(deviceId);
             await Task.WhenAll(healthTask, trackTask);
 
-            var health = healthTask.Result;
-            var track  = trackTask.Result;
-
-            return ServiceResult<DeviceTelemetryResponse>.Ok(MapTelemetry(deviceId, health, track, _statusCache.GetStatus(deviceId)));
+            return ServiceResult<DeviceTelemetryResponse>.Ok(
+                MapTelemetry(deviceId, healthTask.Result, trackTask.Result, _statusCache.GetStatus(deviceId)));
         }
         catch (Exception ex)
         {
@@ -170,13 +167,13 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
         try
         {
             var profiles = companyId.HasValue
-                ? _db.GetUsersByCompanyId(companyId.Value)
-                : _db.GetAllUserProfiles();
+                ? await _db.GetUsersByCompanyId(companyId.Value)
+                : await _db.GetAllUserProfiles();
 
             var tasks = profiles.Select(async p =>
             {
-                var health = await Task.Run(() => _db.GetLatestHealthSnapshot(p.DeviceId));
-                var track  = await Task.Run(() => _db.GetLatestGnssTrack(p.DeviceId));
+                var health = await _db.GetLatestHealthSnapshot(p.DeviceId);
+                var track  = await _db.GetLatestGnssTrack(p.DeviceId);
                 return MapTelemetry(p.DeviceId, health, track, _statusCache.GetStatus(p.DeviceId));
             });
 

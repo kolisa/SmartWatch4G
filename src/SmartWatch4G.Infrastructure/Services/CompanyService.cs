@@ -18,98 +18,97 @@ public sealed class CompanyService : ICompanyService
         _logger = logger;
     }
 
-    public Task<ServiceResult<CompanyResponse>> CreateAsync(CreateCompanyRequest request)
+    public async Task<ServiceResult<CompanyResponse>> CreateAsync(CreateCompanyRequest request)
     {
         try
         {
-            var id = _db.CreateCompany(request.Name, request.RegistrationNumber,
+            var id = await _db.CreateCompany(request.Name, request.RegistrationNumber,
                 request.ContactEmail, request.ContactPhone, request.Address);
 
             if (id < 0)
-                return Task.FromResult(ServiceResult<CompanyResponse>.Fail("Failed to create company.", 500));
+                return ServiceResult<CompanyResponse>.Fail("Failed to create company.", 500);
 
-            var created = _db.GetCompany(id);
-            return Task.FromResult(created is not null
+            var created = await _db.GetCompany(id);
+            return created is not null
                 ? ServiceResult<CompanyResponse>.Ok(Map(created))
-                : ServiceResult<CompanyResponse>.Fail("Failed to retrieve company after creation.", 500));
+                : ServiceResult<CompanyResponse>.Fail("Failed to retrieve company after creation.", 500);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "CreateAsync failed for company '{Name}'", request.Name);
-            return Task.FromResult(ServiceResult<CompanyResponse>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<CompanyResponse>.Fail("An unexpected error occurred.", 500);
         }
     }
 
-    public Task<ServiceResult<CompanyResponse>> GetByIdAsync(int id)
+    public async Task<ServiceResult<CompanyResponse>> GetByIdAsync(int id)
     {
         try
         {
-            var company = _db.GetCompany(id);
-            return Task.FromResult(company is not null
+            var company = await _db.GetCompany(id);
+            return company is not null
                 ? ServiceResult<CompanyResponse>.Ok(Map(company))
-                : ServiceResult<CompanyResponse>.Fail("Company not found.", 404));
+                : ServiceResult<CompanyResponse>.Fail("Company not found.", 404);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetByIdAsync failed for id={Id}", id);
-            return Task.FromResult(ServiceResult<CompanyResponse>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<CompanyResponse>.Fail("An unexpected error occurred.", 500);
         }
     }
 
-    public Task<ServiceResult<IReadOnlyList<CompanyResponse>>> GetAllAsync()
+    public async Task<ServiceResult<IReadOnlyList<CompanyResponse>>> GetAllAsync()
     {
         try
         {
-            var companies = _db.GetAllCompanies();
+            var companies = await _db.GetAllCompanies();
             IReadOnlyList<CompanyResponse> result = companies.Select(Map).ToList();
-            return Task.FromResult(ServiceResult<IReadOnlyList<CompanyResponse>>.Ok(result));
+            return ServiceResult<IReadOnlyList<CompanyResponse>>.Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetAllAsync failed");
-            return Task.FromResult(
-                ServiceResult<IReadOnlyList<CompanyResponse>>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<IReadOnlyList<CompanyResponse>>.Fail("An unexpected error occurred.", 500);
         }
     }
 
-    public Task<ServiceResult<CompanyResponse>> UpdateAsync(int id, UpdateCompanyRequest request)
+    public async Task<ServiceResult<CompanyResponse>> UpdateAsync(int id, UpdateCompanyRequest request)
     {
         try
         {
-            var existing = _db.GetCompany(id);
+            var existing = await _db.GetCompany(id);
             if (existing is null)
-                return Task.FromResult(ServiceResult<CompanyResponse>.Fail("Company not found.", 404));
+                return ServiceResult<CompanyResponse>.Fail("Company not found.", 404);
 
-            _db.UpdateCompany(id, request.Name, request.RegistrationNumber,
+            await _db.UpdateCompany(id, request.Name, request.RegistrationNumber,
                 request.ContactEmail, request.ContactPhone, request.Address);
 
-            var updated = _db.GetCompany(id);
-            return Task.FromResult(updated is not null
+            var updated = await _db.GetCompany(id);
+            return updated is not null
                 ? ServiceResult<CompanyResponse>.Ok(Map(updated))
-                : ServiceResult<CompanyResponse>.Fail("Failed to retrieve company after update.", 500));
+                : ServiceResult<CompanyResponse>.Fail("Failed to retrieve company after update.", 500);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "UpdateAsync failed for id={Id}", id);
-            return Task.FromResult(ServiceResult<CompanyResponse>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<CompanyResponse>.Fail("An unexpected error occurred.", 500);
         }
     }
 
-    public Task<ServiceResult<bool>> DeleteAsync(int id)
+    public async Task<ServiceResult<bool>> DeleteAsync(int id)
     {
         try
         {
-            var existing = _db.GetCompany(id);
+            var existing = await _db.GetCompany(id);
             if (existing is null)
-                return Task.FromResult(ServiceResult<bool>.Fail("Company not found.", 404));
+                return ServiceResult<bool>.Fail("Company not found.", 404);
 
-            _db.DeleteCompany(id);
-            return Task.FromResult(ServiceResult<bool>.Ok(true));
+            await _db.DeleteCompany(id);
+            return ServiceResult<bool>.Ok(true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "DeleteAsync failed for id={Id}", id);
-            return Task.FromResult(ServiceResult<bool>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<bool>.Fail("An unexpected error occurred.", 500);
         }
     }
 
@@ -125,24 +124,22 @@ public sealed class CompanyService : ICompanyService
         UpdatedAt          = c.UpdatedAt
     };
 
-    public Task<ServiceResult<IReadOnlyList<UserResponse>>> GetUsersAsync(int companyId)
+    public async Task<ServiceResult<IReadOnlyList<UserResponse>>> GetUsersAsync(int companyId)
     {
         try
         {
-            var company = _db.GetCompany(companyId);
+            var company = await _db.GetCompany(companyId);
             if (company is null)
-                return Task.FromResult(
-                    ServiceResult<IReadOnlyList<UserResponse>>.Fail("Company not found.", 404));
+                return ServiceResult<IReadOnlyList<UserResponse>>.Fail("Company not found.", 404);
 
-            var profiles = _db.GetUsersByCompanyId(companyId);
+            var profiles = await _db.GetUsersByCompanyId(companyId);
             IReadOnlyList<UserResponse> result = profiles.Select(MapUser).ToList();
-            return Task.FromResult(ServiceResult<IReadOnlyList<UserResponse>>.Ok(result));
+            return ServiceResult<IReadOnlyList<UserResponse>>.Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetUsersAsync failed for company {Id}", companyId);
-            return Task.FromResult(
-                ServiceResult<IReadOnlyList<UserResponse>>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<IReadOnlyList<UserResponse>>.Fail("An unexpected error occurred.", 500);
         }
     }
 

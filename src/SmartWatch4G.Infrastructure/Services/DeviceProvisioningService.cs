@@ -35,8 +35,8 @@ public sealed class DeviceProvisioningService : IDeviceProvisioningService
     public async Task<DeviceProvisioningReport> ProvisionAllAsync(int? companyId = null)
     {
         var profiles = companyId.HasValue
-            ? _db.GetUsersByCompanyId(companyId.Value)
-            : _db.GetAllUserProfiles();
+            ? await _db.GetUsersByCompanyId(companyId.Value)
+            : await _db.GetAllUserProfiles();
 
         var activeDevices = profiles
             .Where(p => p.IsActive)
@@ -71,7 +71,7 @@ public sealed class DeviceProvisioningService : IDeviceProvisioningService
 
         // Load whatever is already in the settings tables so we can skip commands
         // that were already successfully provisioned on a previous run.
-        var config = _db.GetDeviceConfig(deviceId);
+        var config = await _db.GetDeviceConfig(deviceId);
 
         // ── 1. Set Data Frequency ──────────────────────────────────────────────
         // POST /entservice/cmd/datafreq
@@ -93,7 +93,7 @@ public sealed class DeviceProvisioningService : IDeviceProvisioningService
                 };
                 var res = await _iwown.SetDataFreqAsync(req);
                 if (res?.ReturnCode != 0) return false;
-                _settings.SaveDataFreq(req);
+                await _settings.SaveDataFreq(req);
                 return true;
             });
         }
@@ -118,7 +118,7 @@ public sealed class DeviceProvisioningService : IDeviceProvisioningService
                 };
                 var res = await _iwown.GpsLocateAsync(req);
                 if (res?.ReturnCode != 0) return false;
-                _settings.SaveGpsLocate(req);
+                await _settings.SaveGpsLocate(req);
                 return true;
             });
         }
@@ -128,7 +128,7 @@ public sealed class DeviceProvisioningService : IDeviceProvisioningService
         await RetryUntilSuccessAsync(deviceId, "cmd/datasync", errors, async () =>
         {
             var res = await _iwown.RequestDataSyncAsync(new DeviceIdRequest { device_id = deviceId });
-            return res?.ReturnCode == 0;
+            return res?.Succeeded == true;
         });
 
         // ── 4. Get Real-Time Location ──────────────────────────────────────────
@@ -136,7 +136,7 @@ public sealed class DeviceProvisioningService : IDeviceProvisioningService
         await RetryUntilSuccessAsync(deviceId, "cmd/realtime/location", errors, async () =>
         {
             var res = await _iwown.EnableRealtimeLocationAsync(new DeviceIdRequest { device_id = deviceId });
-            return res?.ReturnCode == 0;
+            return res?.Succeeded == true;
         });
 
         // ── 5. Get Device Status ───────────────────────────────────────────────
@@ -144,7 +144,7 @@ public sealed class DeviceProvisioningService : IDeviceProvisioningService
         await RetryUntilSuccessAsync(deviceId, "device/status", errors, async () =>
         {
             var res = await _iwown.GetDeviceStatusAsync(deviceId);
-            return res?.ReturnCode == 0;
+            return res?.Succeeded == true;
         });
 
         var success = errors.Count == 0;

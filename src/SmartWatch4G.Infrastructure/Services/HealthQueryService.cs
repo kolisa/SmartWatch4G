@@ -4,7 +4,6 @@ using SmartWatch4G.Application.Interfaces;
 using SmartWatch4G.Domain.Common;
 using SmartWatch4G.Domain.Entities;
 using SmartWatch4G.Domain.Interfaces;
-using SysDateTime = System.DateTime;
 
 namespace SmartWatch4G.Infrastructure.Services;
 
@@ -21,15 +20,15 @@ public sealed class HealthQueryService : IHealthQueryService
         _logger = logger;
     }
 
-    public Task<ServiceResult<HealthPagedResult>> GetByCompanyAsync(int companyId, HealthQueryParams q)
+    public async Task<ServiceResult<HealthPagedResult>> GetByCompanyAsync(int companyId, HealthQueryParams q)
     {
         try
         {
             if (!ValidateDateRange(q.From, q.To, out var err))
-                return Task.FromResult(ServiceResult<HealthPagedResult>.Fail(err!, 400));
+                return ServiceResult<HealthPagedResult>.Fail(err!, 400);
 
             var (skip, take) = Paging(q);
-            var (items, total) = _db.GetHealthSnapshotsByCompany(
+            var (items, total) = await _db.GetHealthSnapshotsByCompany(
                 companyId, q.From, q.To, skip, take, q.SortDir);
 
             var result = new HealthPagedResult
@@ -39,24 +38,24 @@ public sealed class HealthQueryService : IHealthQueryService
                 Page       = q.Page,
                 PageSize   = q.PageSize
             };
-            return Task.FromResult(ServiceResult<HealthPagedResult>.Ok(result));
+            return ServiceResult<HealthPagedResult>.Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "HealthQueryService.GetByCompanyAsync failed for company {Id}", companyId);
-            return Task.FromResult(ServiceResult<HealthPagedResult>.Fail(UnexpectedError, 500));
+            return ServiceResult<HealthPagedResult>.Fail(UnexpectedError, 500);
         }
     }
 
-    public Task<ServiceResult<IReadOnlyList<HealthSummaryResponse>>> GetSummaryByCompanyAsync(
+    public async Task<ServiceResult<IReadOnlyList<HealthSummaryResponse>>> GetSummaryByCompanyAsync(
         int companyId, System.DateTime? from, System.DateTime? to)
     {
         try
         {
             if (!ValidateDateRange(from, to, out var err))
-                return Task.FromResult(ServiceResult<IReadOnlyList<HealthSummaryResponse>>.Fail(err!, 400));
+                return ServiceResult<IReadOnlyList<HealthSummaryResponse>>.Fail(err!, 400);
 
-            var rows = _db.GetHealthSummaryByCompany(companyId, from, to);
+            var rows = await _db.GetHealthSummaryByCompany(companyId, from, to);
             IReadOnlyList<HealthSummaryResponse> list = rows.Select(x => new HealthSummaryResponse
             {
                 DeviceId     = x.DeviceId,
@@ -70,24 +69,24 @@ public sealed class HealthQueryService : IHealthQueryService
                 RecordCount  = x.Count
             }).ToList();
 
-            return Task.FromResult(ServiceResult<IReadOnlyList<HealthSummaryResponse>>.Ok(list));
+            return ServiceResult<IReadOnlyList<HealthSummaryResponse>>.Ok(list);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "HealthQueryService.GetSummaryByCompanyAsync failed for company {Id}", companyId);
-            return Task.FromResult(ServiceResult<IReadOnlyList<HealthSummaryResponse>>.Fail(UnexpectedError, 500));
+            return ServiceResult<IReadOnlyList<HealthSummaryResponse>>.Fail(UnexpectedError, 500);
         }
     }
 
-    public Task<ServiceResult<HealthPagedResult>> GetByDeviceAsync(string deviceId, HealthQueryParams q)
+    public async Task<ServiceResult<HealthPagedResult>> GetByDeviceAsync(string deviceId, HealthQueryParams q)
     {
         try
         {
             if (!ValidateDateRange(q.From, q.To, out var err))
-                return Task.FromResult(ServiceResult<HealthPagedResult>.Fail(err!, 400));
+                return ServiceResult<HealthPagedResult>.Fail(err!, 400);
 
             var (skip, take) = Paging(q);
-            var (items, total) = _db.GetHealthSnapshotsByDevice(
+            var (items, total) = await _db.GetHealthSnapshotsByDevice(
                 deviceId, q.From, q.To, skip, take, q.SortDir);
 
             var result = new HealthPagedResult
@@ -97,29 +96,29 @@ public sealed class HealthQueryService : IHealthQueryService
                 Page       = q.Page,
                 PageSize   = q.PageSize
             };
-            return Task.FromResult(ServiceResult<HealthPagedResult>.Ok(result));
+            return ServiceResult<HealthPagedResult>.Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "HealthQueryService.GetByDeviceAsync failed for {Device}", deviceId);
-            return Task.FromResult(ServiceResult<HealthPagedResult>.Fail(UnexpectedError, 500));
+            return ServiceResult<HealthPagedResult>.Fail(UnexpectedError, 500);
         }
     }
 
-    public Task<ServiceResult<HealthRecordResponse>> GetLatestByDeviceAsync(string deviceId)
+    public async Task<ServiceResult<HealthRecordResponse>> GetLatestByDeviceAsync(string deviceId)
     {
         try
         {
-            var snap = _db.GetLatestHealthSnapshot(deviceId);
+            var snap = await _db.GetLatestHealthSnapshot(deviceId);
             if (snap is null)
-                return Task.FromResult(ServiceResult<HealthRecordResponse>.Fail("No health data found for this device.", 404));
+                return ServiceResult<HealthRecordResponse>.Fail("No health data found for this device.", 404);
 
-            return Task.FromResult(ServiceResult<HealthRecordResponse>.Ok(MapRecord(deviceId, null, snap)));
+            return ServiceResult<HealthRecordResponse>.Ok(MapRecord(deviceId, null, snap));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "HealthQueryService.GetLatestByDeviceAsync failed for {Device}", deviceId);
-            return Task.FromResult(ServiceResult<HealthRecordResponse>.Fail(UnexpectedError, 500));
+            return ServiceResult<HealthRecordResponse>.Fail(UnexpectedError, 500);
         }
     }
 

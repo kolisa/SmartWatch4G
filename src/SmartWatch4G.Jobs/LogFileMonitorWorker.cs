@@ -41,10 +41,6 @@ public sealed class LogFileMonitorWorker : IDisposable
         _db     = db;
         _logger = logger;
 
-        // Mirror exactly how Program.cs registers MyFileLoggerProvider:
-        //   Path.Combine(env.ContentRootPath, "logs", "SmartWatch4gData.log")
-        // If Logging:LogBasePath is configured, resolve it relative to ContentRootPath
-        // when it is not already an absolute path.
         var configured = config["Logging:LogBasePath"];
         if (string.IsNullOrWhiteSpace(configured))
         {
@@ -86,14 +82,12 @@ public sealed class LogFileMonitorWorker : IDisposable
         _logger.LogInformation("LogFileMonitorWorker: watching directory {Dir} for *.log changes", dir);
     }
 
-    private void OnFileEvent(object sender, FileSystemEventArgs e)
+    private async void OnFileEvent(object sender, FileSystemEventArgs e)
     {
-        // Non-blocking try — if Quartz is already processing, skip; it will catch up
-        // Guard against callbacks firing after Dispose (e.g. during test teardown)
         if (_disposed) return;
         if (_lock.Wait(0))
         {
-            try  { InternalExecute(); }
+            try  { await InternalExecuteAsync(); }
             catch (Exception ex) { _logger.LogError(ex, "LogFileMonitorWorker FSW error"); }
             finally { _lock.Release(); }
         }
@@ -101,12 +95,12 @@ public sealed class LogFileMonitorWorker : IDisposable
 
     // ── Quartz entry point (fallback polling) ─────────────────────────────────
 
-    public void Execute()
+    public async Task Execute()
     {
         if (_disposed) return;
-        if (_lock.Wait(0))
+        if (await _lock.WaitAsync(0))
         {
-            try  { InternalExecute(); }
+            try  { await InternalExecuteAsync(); }
             catch (Exception ex) { _logger.LogError(ex, "LogFileMonitorWorker poll error"); }
             finally { _lock.Release(); }
         }
@@ -114,7 +108,7 @@ public sealed class LogFileMonitorWorker : IDisposable
 
     // ── Core processing ───────────────────────────────────────────────────────
 
-    private void InternalExecute()
+    private async Task InternalExecuteAsync()
     {
         var daily = DailyPath();
 
@@ -127,7 +121,7 @@ public sealed class LogFileMonitorWorker : IDisposable
 
         if (!File.Exists(_currentFile)) return;
 
-        ReadNewLines();
+        await ReadNewLinesAsync();
         _offsets[_currentFile] = _currentOffset;
         SaveState();
     }
@@ -157,7 +151,7 @@ public sealed class LogFileMonitorWorker : IDisposable
         catch { /* best-effort */ }
     }
 
-    private void ReadNewLines()
+    private async Task ReadNewLinesAsync()
     {
         using var fs = new FileStream(
             _currentFile,
@@ -165,7 +159,6 @@ public sealed class LogFileMonitorWorker : IDisposable
             FileAccess.Read,
             FileShare.ReadWrite | FileShare.Delete);
 
-        // reset offset if file was truncated / rotated
         if (_currentOffset > fs.Length)
             _currentOffset = 0;
 
@@ -173,15 +166,14 @@ public sealed class LogFileMonitorWorker : IDisposable
 
         using var reader = new StreamReader(fs);
         string? line;
-        while ((line = reader.ReadLine()) != null)
-            ParseLine(line);
+        while ((line = await reader.ReadLineAsync()) != null)
+            await ParseLineAsync(line);
 
         _currentOffset = fs.Position;
     }
 
     // ── Regex patterns ────────────────────────────────────────────────────────
 
-    // "4/20/2026 7:41:21 AM: Information - {msg}"
     static readonly Regex RxMsg = new(
         @"^\d+/\d+/\d+ \d+:\d+:\d+ [AP]M: \w+ - (.+)$",
         RegexOptions.Compiled);
@@ -202,7 +194,7 @@ public sealed class LogFileMonitorWorker : IDisposable
 
     // ── Line parser ───────────────────────────────────────────────────────────
 
-    private void ParseLine(string line)
+    private async Task ParseLineAsync(string line)
     {
         var msgMatch = RxMsg.Match(line);
         if (!msgMatch.Success) return;
@@ -216,8 +208,8 @@ public sealed class LogFileMonitorWorker : IDisposable
             return;
         }
 
-        if ((m = RxCallLog.Match(msg)).Success) { ParseCallLog(m.Groups[1].Value);  return; }
-        if ((m = RxDevInfo.Match(msg)).Success) { ParseDeviceInfo(m.Groups[1].Value); return; }
+        if ((m = RxCallLog.Match(msg)).Success) { await ParseCallLogAsync(m.Groups[1].Value);  return; }
+        if ((m = RxDevInfo.Match(msg)).Success) { await ParseDeviceInfoAsync(m.Groups[1].Value); return; }
 
         if (string.IsNullOrEmpty(_currentDeviceId)) return;
 
@@ -225,14 +217,14 @@ public sealed class LogFileMonitorWorker : IDisposable
         {
             if (double.TryParse(m.Groups[2].Value, out var lon) &&
                 double.TryParse(m.Groups[3].Value, out var lat))
-                _db.InsertGpsTrack(_currentDeviceId,
+                await _db.InsertGpsTrack(_currentDeviceId,
                     m.Groups[1].Value.Trim(), lon, lat, m.Groups[4].Value.Trim());
             return;
         }
 
         if ((m = RxBattery.Match(msg)).Success)
         {
-            _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
+            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
                 battery: int.Parse(m.Groups[2].Value),
                 rssi:    int.Parse(m.Groups[3].Value));
             return;
@@ -242,14 +234,14 @@ public sealed class LogFileMonitorWorker : IDisposable
         {
             if (double.TryParse(m.Groups[3].Value, out var dist) &&
                 double.TryParse(m.Groups[4].Value, out var cal))
-                _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
+                await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
                     steps: int.Parse(m.Groups[2].Value), distance: dist, calorie: cal);
             return;
         }
 
         if ((m = RxHr.Match(msg)).Success)
         {
-            _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
+            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
                 avgHr: int.Parse(m.Groups[2].Value),
                 maxHr: int.Parse(m.Groups[3].Value),
                 minHr: int.Parse(m.Groups[4].Value));
@@ -258,14 +250,14 @@ public sealed class LogFileMonitorWorker : IDisposable
 
         if ((m = RxSpo2.Match(msg)).Success)
         {
-            _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
+            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
                 avgSpo2: int.Parse(m.Groups[2].Value));
             return;
         }
 
         if ((m = RxBp.Match(msg)).Success)
         {
-            _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
+            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
                 sbp: int.Parse(m.Groups[2].Value),
                 dbp: int.Parse(m.Groups[3].Value));
             return;
@@ -273,31 +265,31 @@ public sealed class LogFileMonitorWorker : IDisposable
 
         if ((m = RxFatigue.Match(msg)).Success)
         {
-            _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
+            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
                 fatigue: int.Parse(m.Groups[2].Value));
             return;
         }
 
         if ((m = RxLowPower.Match(msg)).Success)
         {
-            _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value,
+            await _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value,
                 "low_power", $"battery:{m.Groups[2].Value}");
             return;
         }
 
         if ((m = RxNotWear.Match(msg)).Success)
         {
-            _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value, "not_wear");
+            await _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value, "not_wear");
             return;
         }
 
         if ((m = RxSosAlarm.Match(msg)).Success)
-            _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value, "sos");
+            await _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value, "sos");
     }
 
     // ── JSON parsers ──────────────────────────────────────────────────────────
 
-    private void ParseCallLog(string json)
+    private async Task ParseCallLogAsync(string json)
     {
         try
         {
@@ -318,12 +310,12 @@ public sealed class LogFileMonitorWorker : IDisposable
                     double.TryParse(lonEl.GetString(), out var lnv)) lon = lnv;
 
                 if (lat.HasValue && lon.HasValue)
-                    _db.InsertGpsTrack(deviceId, alarmTime, lon.Value, lat.Value, "SOS");
+                    await _db.InsertGpsTrack(deviceId, alarmTime, lon.Value, lat.Value, "SOS");
 
                 if (!sos.TryGetProperty("call_logs", out var calls)) continue;
 
                 foreach (var call in calls.EnumerateArray())
-                    _db.InsertSosEvent(
+                    await _db.InsertSosEvent(
                         deviceId, alarmTime, lat, lon,
                         call.TryGetProperty("call_number", out var num)    ? num.GetString()    : null,
                         call.TryGetProperty("status",      out var status) ? status.GetInt32()  : null,
@@ -334,13 +326,13 @@ public sealed class LogFileMonitorWorker : IDisposable
         catch (Exception ex) { _logger.LogError(ex, "ParseCallLog failed"); }
     }
 
-    private void ParseDeviceInfo(string json)
+    private async Task ParseDeviceInfoAsync(string json)
     {
         try
         {
             using var doc = JsonDocument.Parse(json);
             var root      = doc.RootElement;
-            _db.InsertDeviceInfo(
+            await _db.InsertDeviceInfo(
                 root.GetProperty("deviceid").GetString() ?? _currentDeviceId,
                 System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 root.TryGetProperty("model",          out var mo) ? mo.GetString() : null,

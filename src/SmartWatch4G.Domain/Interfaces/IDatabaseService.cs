@@ -4,129 +4,129 @@ namespace SmartWatch4G.Domain.Interfaces;
 
 public interface IDatabaseService
 {
-    void InsertGpsTrack(string deviceId, string gnssTime, double longitude, double latitude, string locType);
+    Task InsertGpsTrack(string deviceId, string gnssTime, double longitude, double latitude, string locType);
 
-    void UpsertHealthSnapshot(string deviceId, string recordTime,
+    Task UpsertHealthSnapshot(string deviceId, string recordTime,
         int? battery = null, int? rssi = null,
         int? steps = null, double? distance = null, double? calorie = null,
         int? avgHr = null, int? maxHr = null, int? minHr = null,
         int? avgSpo2 = null, int? sbp = null, int? dbp = null, int? fatigue = null);
 
-    void InsertAlarm(string deviceId, string alarmTime, string alarmType, string? details = null);
+    Task InsertAlarm(string deviceId, string alarmTime, string alarmType, string? details = null);
 
-    void InsertSosEvent(string deviceId, string alarmTime,
+    Task InsertSosEvent(string deviceId, string alarmTime,
         double? lat, double? lon,
         string? callNumber, int? callStatus, string? callStart, string? callEnd);
 
-    void InsertDeviceInfo(string deviceId, string recordedAt,
+    Task InsertDeviceInfo(string deviceId, string recordedAt,
         string? model, string? version, string? wearingStatus, string? signal, string rawJson);
 
-    void InsertSleepCalculation(string deviceId, string recordDate,
+    Task InsertSleepCalculation(string deviceId, string recordDate,
         int completed, string? startTime, string? endTime, int hr, int turnTimes,
         double? respAvg, double? respMax, double? respMin, string? sectionsJson);
 
-    void InsertEcgCalculation(string deviceId, int result, int hr, int effective, int direction);
+    Task InsertEcgCalculation(string deviceId, int result, int hr, int effective, int direction);
 
-    void InsertAfCalculation(string deviceId, int result);
+    Task InsertAfCalculation(string deviceId, int result);
 
-    void InsertSpo2Calculation(string deviceId, double spo2Score, int? oshahsRisk);
+    Task InsertSpo2Calculation(string deviceId, double spo2Score, int? oshahsRisk);
 
-    void UpsertUserProfile(string deviceId, string name, string surname,
+    Task UpsertUserProfile(string deviceId, string name, string surname,
         string? email = null, string? cell = null, string? empNo = null, string? address = null,
         int? companyId = null);
 
-    UserProfile? GetUserProfile(string deviceId);
+    Task<UserProfile?> GetUserProfile(string deviceId);
 
-    IReadOnlyList<UserProfile> GetAllUserProfiles();
+    Task<IReadOnlyList<UserProfile>> GetAllUserProfiles();
 
-    IReadOnlyList<UserProfile> GetUsersByCompanyId(int companyId);
+    Task<IReadOnlyList<UserProfile>> GetUsersByCompanyId(int companyId);
 
-    void DeleteUserProfile(string deviceId);
+    Task DeleteUserProfile(string deviceId);
 
-    void ReactivateUserProfile(string deviceId);
+    Task ReactivateUserProfile(string deviceId);
 
     // ── Company CRUD ──────────────────────────────────────────────────────────
 
-    int CreateCompany(string name, string? registrationNumber, string? contactEmail,
+    Task<int> CreateCompany(string name, string? registrationNumber, string? contactEmail,
         string? contactPhone, string? address);
 
-    Company? GetCompany(int id);
+    Task<Company?> GetCompany(int id);
 
-    IReadOnlyList<Company> GetAllCompanies();
+    Task<IReadOnlyList<Company>> GetAllCompanies();
 
-    void UpdateCompany(int id, string name, string? registrationNumber, string? contactEmail,
+    Task UpdateCompany(int id, string name, string? registrationNumber, string? contactEmail,
         string? contactPhone, string? address);
 
-    void DeleteCompany(int id);
+    Task DeleteCompany(int id);
 
-    void LinkUserToCompany(string deviceId, int? companyId);
+    Task LinkUserToCompany(string deviceId, int? companyId);
 
     /// <summary>
     /// Updates user_id and company_id on every data table row that belongs to this device,
     /// pulling the values from the active user_profiles entry.
     /// Returns the total number of rows updated across all tables, or -1 on error.
     /// </summary>
-    int BackfillDeviceRecords(string deviceId);
+    Task<int> BackfillDeviceRecords(string deviceId);
 
-    GnssTrack? GetLatestGnssTrack(string deviceId);
+    Task<GnssTrack?> GetLatestGnssTrack(string deviceId);
 
-    IReadOnlyList<GnssTrack> GetGnssTracks(string deviceId, System.DateTime? from, System.DateTime? to);
+    Task<IReadOnlyList<GnssTrack>> GetGnssTracks(string deviceId, System.DateTime? from, System.DateTime? to);
 
-    HealthSnapshot? GetLatestHealthSnapshot(string deviceId);
+    Task<HealthSnapshot?> GetLatestHealthSnapshot(string deviceId);
 
-    int GetActiveWorkerCount();
+    Task<int> GetActiveWorkerCount();
 
-    int GetActiveWorkerCountByCompany(int companyId);
+    Task<int> GetActiveWorkerCountByCompany(int companyId);
 
-    IReadOnlyList<UserProfile> GetPagedUserProfiles(int skip, int take);
+    Task<IReadOnlyList<UserProfile>> GetPagedUserProfiles(int skip, int take);
 
-    IReadOnlyList<UserProfile> GetPagedUserProfilesByCompany(int skip, int take, int companyId);
+    Task<IReadOnlyList<UserProfile>> GetPagedUserProfilesByCompany(int skip, int take, int companyId);
 
-    int GetRecentAlarmCount(int withinHours);
+    Task<int> GetRecentAlarmCount(int withinHours);
 
-    int GetRecentSosCount(int withinHours);
+    Task<int> GetRecentSosCount(int withinHours);
 
-    IReadOnlyList<AlarmEvent> GetRecentAlarms(int withinHours, int limit);
+    Task<IReadOnlyList<AlarmEvent>> GetRecentAlarms(int withinHours, int limit);
 
     /// <summary>
     /// Returns worker count, alarm count, and SOS count for the given time window
     /// in a single round trip — avoids three separate COUNT queries for the dashboard.
     /// </summary>
-    (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours);
+    Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCounts(int withinHours);
 
-    (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCountsByCompany(int withinHours, int companyId);
+    Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCountsByCompany(int withinHours, int companyId);
 
     // ── GPS queries ───────────────────────────────────────────────────────────
 
     /// <summary>Returns paged GPS tracks for all devices in a company, with optional date filter.</summary>
-    (IReadOnlyList<(string DeviceId, string? UserName, GnssTrack Track)> Items, int TotalCount)
+    Task<(IReadOnlyList<(string DeviceId, string? UserName, GnssTrack Track)> Items, int TotalCount)>
         GetGnssTracksByCompany(int companyId, System.DateTime? from, System.DateTime? to,
             int skip, int take, string sortDir, bool onlineOnly, bool offlineOnly);
 
     /// <summary>Returns total online and offline device counts for a company.</summary>
-    (int Online, int Offline) GetDeviceStatusCountsByCompany(int companyId, System.Collections.Generic.IReadOnlyList<string> onlineDeviceIds);
+    Task<(int Online, int Offline)> GetDeviceStatusCountsByCompany(int companyId, System.Collections.Generic.IReadOnlyList<string> onlineDeviceIds);
 
     // ── Health queries ────────────────────────────────────────────────────────
 
     /// <summary>Returns paged health snapshots for a single device with date filters.</summary>
-    (IReadOnlyList<HealthSnapshot> Items, int TotalCount)
+    Task<(IReadOnlyList<HealthSnapshot> Items, int TotalCount)>
         GetHealthSnapshotsByDevice(string deviceId, System.DateTime? from, System.DateTime? to,
             int skip, int take, string sortDir);
 
     /// <summary>Returns paged health snapshots for all devices in a company with date filters.</summary>
-    (IReadOnlyList<(string DeviceId, string? UserName, HealthSnapshot Snapshot)> Items, int TotalCount)
+    Task<(IReadOnlyList<(string DeviceId, string? UserName, HealthSnapshot Snapshot)> Items, int TotalCount)>
         GetHealthSnapshotsByCompany(int companyId, System.DateTime? from, System.DateTime? to,
             int skip, int take, string sortDir);
 
     /// <summary>Returns per-device health aggregates (avg HR, avg SpO2, total steps) for a company.</summary>
-    IReadOnlyList<(string DeviceId, string? UserName, double? AvgHr, double? AvgSpo2,
-        double? AvgFatigue, int? MaxHr, int? MinHr, int? TotalSteps, int Count)>
+    Task<IReadOnlyList<(string DeviceId, string? UserName, double? AvgHr, double? AvgSpo2,
+        double? AvgFatigue, int? MaxHr, int? MinHr, int? TotalSteps, int Count)>>
         GetHealthSummaryByCompany(int companyId, System.DateTime? from, System.DateTime? to);
 
     // ── Device configuration queries ──────────────────────────────────────────
 
     /// <summary>Returns consolidated command configuration for a single device by joining all device_* setting tables.</summary>
-    (string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+    Task<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
         // data freq
         bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
         bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
@@ -155,11 +155,11 @@ public interface IDatabaseService
         // auto AF
         bool? AutoAfOpen, int? AutoAfInterval,
         // BP adjust
-        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)?
+        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)?>
         GetDeviceConfig(string deviceId);
 
     /// <summary>Returns consolidated command configurations for all devices in a company.</summary>
-    IReadOnlyList<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+    Task<IReadOnlyList<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
         bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
         bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
         bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
@@ -174,8 +174,19 @@ public interface IDatabaseService
         bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
         bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
         bool? AutoAfOpen, int? AutoAfInterval,
-        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)>
+        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)>>
         GetDeviceConfigsByCompany(int companyId, int skip, int take);
 
-    int GetDeviceConfigCountByCompany(int companyId);
+    Task<int> GetDeviceConfigCountByCompany(int companyId);
+
+    // ── Audit log ─────────────────────────────────────────────────────────────
+
+    Task<(IReadOnlyList<AuditEntry> Items, int TotalCount)> GetAuditLog(
+        string? deviceId = null,
+        string? action = null,
+        string? tableName = null,
+        System.DateTime? from = null,
+        System.DateTime? to = null,
+        int skip = 0,
+        int take = 50);
 }

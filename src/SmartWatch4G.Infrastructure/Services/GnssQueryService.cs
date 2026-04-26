@@ -20,20 +20,19 @@ public sealed class GnssQueryService : IGnssQueryService
         _logger      = logger;
     }
 
-    public Task<ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>> GetOnlineUsersWithTrackingAsync()
+    public async Task<ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>> GetOnlineUsersWithTrackingAsync()
     {
         try
         {
-            var users = _db.GetAllUserProfiles();
+            var users = await _db.GetAllUserProfiles();
             if (users.Count == 0)
-                return Task.FromResult(ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>.Ok([]));
+                return ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>.Ok([]);
 
-            // Read from the in-memory cache (updated every 30 s by DeviceStatusPollingJob)
-            IReadOnlyList<OnlineUserTrackResponse> online = users
+            var tasks = users
                 .Where(u => _statusCache.IsOnline(u.DeviceId))
-                .Select(u =>
+                .Select(async u =>
                 {
-                    var track = _db.GetLatestGnssTrack(u.DeviceId);
+                    var track = await _db.GetLatestGnssTrack(u.DeviceId);
                     if (track is null) return null;
 
                     return new OnlineUserTrackResponse
@@ -42,25 +41,28 @@ public sealed class GnssQueryService : IGnssQueryService
                         LatestTrack  = MapTrack(track),
                         DeviceStatus = "online"
                     };
-                })
+                });
+
+            var results = await Task.WhenAll(tasks);
+            IReadOnlyList<OnlineUserTrackResponse> online = results
                 .OfType<OnlineUserTrackResponse>()
                 .ToList();
 
-            return Task.FromResult(ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>.Ok(online));
+            return ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>.Ok(online);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetOnlineUsersWithTrackingAsync failed");
-            return Task.FromResult(ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<IReadOnlyList<OnlineUserTrackResponse>>.Fail("An unexpected error occurred.", 500);
         }
     }
 
-    public Task<ServiceResult<UserTrackHistoryResponse>> GetTrackHistoryAsync(
+    public async Task<ServiceResult<UserTrackHistoryResponse>> GetTrackHistoryAsync(
         string deviceId, System.DateTime? from, System.DateTime? to)
     {
         try
         {
-            var tracks       = _db.GetGnssTracks(deviceId, from, to);
+            var tracks       = await _db.GetGnssTracks(deviceId, from, to);
             var deviceStatus = _statusCache.GetStatus(deviceId);
 
             var response = new UserTrackHistoryResponse
@@ -70,12 +72,12 @@ public sealed class GnssQueryService : IGnssQueryService
                 TrackHistory = tracks.Select(MapTrack).ToList()
             };
 
-            return Task.FromResult(ServiceResult<UserTrackHistoryResponse>.Ok(response));
+            return ServiceResult<UserTrackHistoryResponse>.Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetTrackHistoryAsync failed for DeviceId {DeviceId}", deviceId);
-            return Task.FromResult(ServiceResult<UserTrackHistoryResponse>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<UserTrackHistoryResponse>.Fail("An unexpected error occurred.", 500);
         }
     }
 
@@ -100,4 +102,3 @@ public sealed class GnssQueryService : IGnssQueryService
         CreatedAt = t.CreatedAt
     };
 }
-

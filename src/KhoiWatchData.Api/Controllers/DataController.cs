@@ -116,7 +116,7 @@ public class DataController : ControllerBase
             switch (opt)
             {
                 case 0x0A:
-                    _oldmanParser.ProceedOldMan(pbPayload, device);
+                    await _oldmanParser.ProceedOldMan(pbPayload, device);
                     break;
                 case 0x80:
                     _historyDataParser.ProceedHistoryData(pbPayload);

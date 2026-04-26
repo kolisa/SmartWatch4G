@@ -22,10 +22,16 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     private SqlConnection Open() => new(_connStr);
 
+    private async Task<SqlConnection> OpenAsync()
+    {
+        var conn = new SqlConnection(_connStr);
+        await conn.OpenAsync();
+        return conn;
+    }
+
     private string MasterConnStr()
     {
         var b = new SqlConnectionStringBuilder(_connStr) { InitialCatalog = "master" };
-        // Prefix with "tcp:" to force TCP/IP and avoid Named Pipes failures under IIS.
         if (!b.DataSource.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
             b.DataSource = "tcp:" + b.DataSource;
         return b.ConnectionString;
@@ -195,7 +201,7 @@ CREATE TABLE device_locate_freq (
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_lcd_gesture')
 CREATE TABLE device_lcd_gesture (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     start_hour INT          NULL,
     end_hour   INT          NULL,
     user_id    INT          NULL,
@@ -205,21 +211,21 @@ CREATE TABLE device_lcd_gesture (
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_hr_alarm')
 CREATE TABLE device_hr_alarm (
-    device_id     NVARCHAR(50) PRIMARY KEY,
-    open          BIT          NULL,
-    high          INT          NULL,
-    low           INT          NULL,
-    threshold     INT          NULL,
-    alarm_interval INT         NULL,
-    user_id        INT         NULL,
-    company_id     INT         NULL,
-    updated_at    DATETIME2    DEFAULT GETDATE()
+    device_id      NVARCHAR(50) PRIMARY KEY,
+    [open]         BIT          NULL,
+    high           INT          NULL,
+    low            INT          NULL,
+    threshold      INT          NULL,
+    alarm_interval INT          NULL,
+    user_id        INT          NULL,
+    company_id     INT          NULL,
+    updated_at     DATETIME2    DEFAULT GETDATE()
 );
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_dynamic_hr_alarm')
 CREATE TABLE device_dynamic_hr_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     high       INT          NULL,
     low        INT          NULL,
     timeout    INT          NULL,
@@ -232,7 +238,7 @@ CREATE TABLE device_dynamic_hr_alarm (
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_spo2_alarm')
 CREATE TABLE device_spo2_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     low        INT          NULL,
     user_id    INT          NULL,
     company_id INT          NULL,
@@ -242,7 +248,7 @@ CREATE TABLE device_spo2_alarm (
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_bp_alarm')
 CREATE TABLE device_bp_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     sbp_high   INT          NULL,
     sbp_below  INT          NULL,
     dbp_high   INT          NULL,
@@ -255,7 +261,7 @@ CREATE TABLE device_bp_alarm (
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_temp_alarm')
 CREATE TABLE device_temp_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     high       INT          NULL,
     low        INT          NULL,
     user_id    INT          NULL,
@@ -266,7 +272,7 @@ CREATE TABLE device_temp_alarm (
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_auto_af')
 CREATE TABLE device_auto_af (
     device_id       NVARCHAR(50) PRIMARY KEY,
-    open            BIT          NULL,
+    [open]          BIT          NULL,
     interval        INT          NULL,
     rri_single_time BIT          NULL,
     rri_type        INT          NULL,
@@ -368,6 +374,8 @@ CREATE TABLE device_clock_alarms (
     hour       INT          NOT NULL,
     minute     INT          NOT NULL,
     title      NVARCHAR(100) NULL,
+    user_id    INT          NULL,
+    company_id INT          NULL,
     created_at DATETIME2    DEFAULT GETDATE()
 );
 
@@ -458,6 +466,16 @@ CREATE TABLE companies (
     updated_at          DATETIME2     DEFAULT GETDATE()
 );
 
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'audit_log')
+CREATE TABLE audit_log (
+    id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+    action      NVARCHAR(20)   NOT NULL,
+    table_name  NVARCHAR(100)  NOT NULL,
+    device_id   NVARCHAR(50)   NULL,
+    details     NVARCHAR(500)  NULL,
+    occurred_at DATETIME2      NOT NULL DEFAULT GETDATE()
+);
+
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'user_profiles')
 BEGIN
     CREATE TABLE user_profiles (
@@ -498,6 +516,11 @@ END";
 
             // ── Indexes (separate batch so all tables are guaranteed to exist) ──────
             const string indexDdl = @"
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_audit_occurred'
+               AND object_id=OBJECT_ID('audit_log'))
+    CREATE INDEX IX_audit_occurred ON audit_log (occurred_at DESC)
+        INCLUDE (action, table_name, device_id);
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_gps_device_id'
                AND object_id=OBJECT_ID('gps_tracks'))
     CREATE INDEX IX_gps_device_id
@@ -551,7 +574,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UQ_sedentary_device_window'
         ADD CONSTRAINT UQ_sedentary_device_window UNIQUE (device_id, start_hour, end_hour);
 
 -- ── Add user_id / company_id to existing tables (idempotent) ─────────────────
-DECLARE @tables NVARCHAR(MAX) = 
+DECLARE @tables NVARCHAR(MAX) =
     'gps_tracks,health_snapshots,alarms,sos_events,device_info_log,' +
     'device_user_info,device_fall_settings,device_data_freq,device_locate_freq,' +
     'device_lcd_gesture,device_hr_alarm,device_dynamic_hr_alarm,device_spo2_alarm,' +
@@ -583,10 +606,6 @@ END
                 idxCmd.ExecuteNonQuery();
 
             // ── Seed default settings for known devices ───────────────────────
-            // Idempotent: INSERT WHERE NOT EXISTS — safe to run on every startup.
-            // device_data_freq and device_gps_settings are intentionally excluded:
-            // those rows are only created by DeviceProvisioningService after the
-            // Iwown API confirms success (ReturnCode == 0).
             var seedSql = @"
 DECLARE @devices TABLE (device_id NVARCHAR(50));
 INSERT INTO @devices VALUES
@@ -601,27 +620,27 @@ SELECT d.device_id,1,300,1,60,2,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_locate_freq t WHERE t.device_id=d.device_id);
 
-INSERT INTO device_hr_alarm (device_id,open,high,low,threshold,alarm_interval,user_id,company_id)
+INSERT INTO device_hr_alarm (device_id,[open],high,low,threshold,alarm_interval,user_id,company_id)
 SELECT d.device_id,1,160,45,5,5,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_hr_alarm t WHERE t.device_id=d.device_id);
 
-INSERT INTO device_dynamic_hr_alarm (device_id,open,high,low,timeout,interval,user_id,company_id)
+INSERT INTO device_dynamic_hr_alarm (device_id,[open],high,low,timeout,interval,user_id,company_id)
 SELECT d.device_id,0,160,45,30,5,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_dynamic_hr_alarm t WHERE t.device_id=d.device_id);
 
-INSERT INTO device_spo2_alarm (device_id,open,low,user_id,company_id)
+INSERT INTO device_spo2_alarm (device_id,[open],low,user_id,company_id)
 SELECT d.device_id,1,90,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_spo2_alarm t WHERE t.device_id=d.device_id);
 
-INSERT INTO device_bp_alarm (device_id,open,sbp_high,sbp_below,dbp_high,dbp_below,user_id,company_id)
+INSERT INTO device_bp_alarm (device_id,[open],sbp_high,sbp_below,dbp_high,dbp_below,user_id,company_id)
 SELECT d.device_id,0,160,90,100,60,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_bp_alarm t WHERE t.device_id=d.device_id);
 
-INSERT INTO device_temp_alarm (device_id,open,high,low,user_id,company_id)
+INSERT INTO device_temp_alarm (device_id,[open],high,low,user_id,company_id)
 SELECT d.device_id,0,39,35,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_temp_alarm t WHERE t.device_id=d.device_id);
@@ -651,7 +670,7 @@ SELECT d.device_id,0,24,0,0,0,0,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_display t WHERE t.device_id=d.device_id);
 
-INSERT INTO device_auto_af (device_id,open,interval,rri_single_time,rri_type,user_id,company_id)
+INSERT INTO device_auto_af (device_id,[open],interval,rri_single_time,rri_type,user_id,company_id)
 SELECT d.device_id,0,60,0,0,u.user_id,1 FROM @devices d
 LEFT JOIN user_profiles u ON u.device_id=d.device_id
 WHERE NOT EXISTS (SELECT 1 FROM device_auto_af t WHERE t.device_id=d.device_id);
@@ -675,11 +694,11 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public void InsertGpsTrack(string deviceId, string gnssTime, double longitude, double latitude, string locType)
+    public async Task InsertGpsTrack(string deviceId, string gnssTime, double longitude, double latitude, string locType)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO gps_tracks (device_id, gnss_time, longitude, latitude, loc_type, user_id, company_id)
                 SELECT @dev, @t, @lon, @lat, @type, u.user_id, u.company_id
@@ -693,12 +712,13 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@lon",  longitude);
             cmd.Parameters.AddWithValue("@lat",  latitude);
             cmd.Parameters.AddWithValue("@type", (object?)locType ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "gps_tracks", deviceId, $"time:{gnssTime},type:{locType}");
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertGpsTrack failed for {Device}", deviceId); }
     }
 
-    public void UpsertHealthSnapshot(string deviceId, string recordTime,
+    public async Task UpsertHealthSnapshot(string deviceId, string recordTime,
         int? battery = null, int? rssi = null,
         int? steps = null, double? distance = null, double? calorie = null,
         int? avgHr = null, int? maxHr = null, int? minHr = null,
@@ -706,7 +726,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 MERGE health_snapshots AS t
                 USING (
@@ -747,16 +767,17 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@sbp",  (object?)sbp      ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@dbp",  (object?)dbp      ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@fat",  (object?)fatigue  ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "UPSERT", "health_snapshots", deviceId, recordTime);
         }
         catch (Exception ex) { _logger.LogError(ex, "UpsertHealthSnapshot failed for {Device}", deviceId); }
     }
 
-    public void InsertAlarm(string deviceId, string alarmTime, string alarmType, string? details = null)
+    public async Task InsertAlarm(string deviceId, string alarmTime, string alarmType, string? details = null)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO alarms (device_id, alarm_time, alarm_type, details, user_id, company_id)
                 SELECT @dev, @t, @type, @det, u.user_id, u.company_id
@@ -769,18 +790,19 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@t",    alarmTime);
             cmd.Parameters.AddWithValue("@type", alarmType);
             cmd.Parameters.AddWithValue("@det",  (object?)details ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "alarms", deviceId, $"type:{alarmType}");
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertAlarm failed for {Device}", deviceId); }
     }
 
-    public void InsertSosEvent(string deviceId, string alarmTime,
+    public async Task InsertSosEvent(string deviceId, string alarmTime,
         double? lat, double? lon,
         string? callNumber, int? callStatus, string? callStart, string? callEnd)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO sos_events (device_id, alarm_time, latitude, longitude, call_number, call_status, call_start, call_end, user_id, company_id)
                 SELECT @dev, @t, @lat, @lon, @num, @status, @start, @end, u.user_id, u.company_id
@@ -796,17 +818,18 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@status", (object?)callStatus ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@start",  (object?)callStart  ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@end",    (object?)callEnd    ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "sos_events", deviceId, alarmTime);
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertSosEvent failed for {Device}", deviceId); }
     }
 
-    public void InsertDeviceInfo(string deviceId, string recordedAt,
+    public async Task InsertDeviceInfo(string deviceId, string recordedAt,
         string? model, string? version, string? wearingStatus, string? signal, string rawJson)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO device_info_log (device_id, recorded_at, model, version, wearing_status, signal, raw_json, user_id, company_id)
                 SELECT @dev, @rat, @model, @ver, @wear, @sig, @json, u.user_id, u.company_id
@@ -819,18 +842,19 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@wear",  (object?)wearingStatus ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@sig",   (object?)signal        ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@json",  rawJson);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "device_info_log", deviceId, $"model:{model},ver:{version}");
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertDeviceInfo failed for {Device}", deviceId); }
     }
 
-    public void InsertSleepCalculation(string deviceId, string recordDate,
+    public async Task InsertSleepCalculation(string deviceId, string recordDate,
         int completed, string? startTime, string? endTime, int hr, int turnTimes,
         double? respAvg, double? respMax, double? respMin, string? sectionsJson)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO sleep_calculations
                     (device_id,record_date,completed,start_time,end_time,hr,turn_times,resp_avg,resp_max,resp_min,sections,user_id,company_id)
@@ -848,16 +872,17 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@rx",   (object?)respMax    ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@rn",   (object?)respMin    ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@sec",  (object?)sectionsJson ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "sleep_calculations", deviceId, recordDate);
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertSleepCalculation failed for {Device}", deviceId); }
     }
 
-    public void InsertEcgCalculation(string deviceId, int result, int hr, int effective, int direction)
+    public async Task InsertEcgCalculation(string deviceId, int result, int hr, int effective, int direction)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO ecg_calculations (device_id,result,hr,effective,direction,user_id,company_id)
                 SELECT @dev,@res,@hr,@eff,@dir, u.user_id, u.company_id
@@ -868,16 +893,17 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@hr",  hr);
             cmd.Parameters.AddWithValue("@eff", effective);
             cmd.Parameters.AddWithValue("@dir", direction);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "ecg_calculations", deviceId, $"result:{result}");
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertEcgCalculation failed for {Device}", deviceId); }
     }
 
-    public void InsertAfCalculation(string deviceId, int result)
+    public async Task InsertAfCalculation(string deviceId, int result)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO af_calculations (device_id,result,user_id,company_id)
                 SELECT @dev,@res, u.user_id, u.company_id
@@ -885,16 +911,17 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
             cmd.Parameters.AddWithValue("@res", result);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "af_calculations", deviceId, $"result:{result}");
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertAfCalculation failed for {Device}", deviceId); }
     }
 
-    public void InsertSpo2Calculation(string deviceId, double spo2Score, int? oshahsRisk)
+    public async Task InsertSpo2Calculation(string deviceId, double spo2Score, int? oshahsRisk)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO spo2_calculations (device_id,spo2_score,osahs_risk,user_id,company_id)
                 SELECT @dev,@score,@risk, u.user_id, u.company_id
@@ -903,18 +930,19 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@dev",   deviceId);
             cmd.Parameters.AddWithValue("@score", spo2Score);
             cmd.Parameters.AddWithValue("@risk",  (object?)oshahsRisk ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "INSERT", "spo2_calculations", deviceId, $"score:{spo2Score}");
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertSpo2Calculation failed for {Device}", deviceId); }
     }
 
-    public void UpsertUserProfile(string deviceId, string name, string surname,
+    public async Task UpsertUserProfile(string deviceId, string name, string surname,
         string? email = null, string? cell = null, string? empNo = null, string? address = null,
         int? companyId = null)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 MERGE user_profiles AS t
                 USING (SELECT @dev AS device_id) AS s ON t.device_id = s.device_id
@@ -938,16 +966,17 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@empNo",     (object?)empNo     ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@address",   (object?)address   ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@companyId", (object?)companyId ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "UPSERT", "user_profiles", deviceId, $"{name} {surname}");
         }
         catch (Exception ex) { _logger.LogError(ex, "UpsertUserProfile failed for {Device}", deviceId); }
     }
 
-    public UserProfile? GetUserProfile(string deviceId)
+    public async Task<UserProfile?> GetUserProfile(string deviceId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
                        u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
@@ -955,8 +984,8 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 LEFT JOIN companies c ON c.id = u.company_id
                 WHERE u.device_id = @dev AND u.is_active = 1", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read()) return null;
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
             return MapUserProfile(reader);
         }
         catch (Exception ex)
@@ -966,12 +995,12 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public IReadOnlyList<UserProfile> GetAllUserProfiles()
+    public async Task<IReadOnlyList<UserProfile>> GetAllUserProfiles()
     {
         var list = new List<UserProfile>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
                        u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
@@ -979,20 +1008,20 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 LEFT JOIN companies c ON c.id = u.company_id
                 WHERE u.is_active = 1
                 ORDER BY u.surname, u.name", conn);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
                 list.Add(MapUserProfile(reader));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetAllUserProfiles failed."); }
         return list;
     }
 
-    public IReadOnlyList<UserProfile> GetUsersByCompanyId(int companyId)
+    public async Task<IReadOnlyList<UserProfile>> GetUsersByCompanyId(int companyId)
     {
         var list = new List<UserProfile>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
                        u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
@@ -1001,25 +1030,26 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 WHERE u.is_active = 1 AND u.company_id = @companyId
                 ORDER BY u.surname, u.name", conn);
             cmd.Parameters.AddWithValue("@companyId", companyId);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
                 list.Add(MapUserProfile(reader));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetUsersByCompanyId failed for company {Id}", companyId); }
         return list;
     }
 
-    public void ReactivateUserProfile(string deviceId)
+    public async Task ReactivateUserProfile(string deviceId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 UPDATE user_profiles
                 SET is_active = 1, updated_at = GETDATE()
                 WHERE device_id = @dev AND is_active = 0", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "UPDATE", "user_profiles", deviceId, "reactivated");
         }
         catch (Exception ex) { _logger.LogError(ex, "ReactivateUserProfile failed for {Device}", deviceId); }
     }
@@ -1040,29 +1070,30 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         IsActive    = true
     };
 
-    public void DeleteUserProfile(string deviceId)
+    public async Task DeleteUserProfile(string deviceId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 UPDATE user_profiles
                 SET is_active = 0, updated_at = GETDATE()
                 WHERE device_id = @dev AND is_active = 1", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "DELETE", "user_profiles", deviceId);
         }
         catch (Exception ex) { _logger.LogError(ex, "DeleteUserProfile failed for {Device}", deviceId); }
     }
 
     // ── Company CRUD ───────────────────────────────────────────────────────────
 
-    public int CreateCompany(string name, string? registrationNumber, string? contactEmail,
+    public async Task<int> CreateCompany(string name, string? registrationNumber, string? contactEmail,
         string? contactPhone, string? address)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO companies (name, registration_number, contact_email, contact_phone, address)
                 OUTPUT INSERTED.id
@@ -1072,7 +1103,9 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@email", (object?)contactEmail       ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@phone", (object?)contactPhone       ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@addr",  (object?)address            ?? DBNull.Value);
-            return (int)cmd.ExecuteScalar()!;
+            var newId = (int)(await cmd.ExecuteScalarAsync())!;
+            await LogAuditAsync(conn, "INSERT", "companies", null, $"id:{newId},name:{name}");
+            return newId;;
         }
         catch (Exception ex)
         {
@@ -1081,19 +1114,19 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public Company? GetCompany(int id)
+    public async Task<Company?> GetCompany(int id)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT id, name, registration_number, contact_email, contact_phone,
                        address, is_active, created_at, updated_at
                 FROM companies
                 WHERE id = @id AND is_active = 1", conn);
             cmd.Parameters.AddWithValue("@id", id);
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read()) return null;
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
             return MapCompany(reader);
         }
         catch (Exception ex)
@@ -1103,20 +1136,20 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public IReadOnlyList<Company> GetAllCompanies()
+    public async Task<IReadOnlyList<Company>> GetAllCompanies()
     {
         var list = new List<Company>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT id, name, registration_number, contact_email, contact_phone,
                        address, is_active, created_at, updated_at
                 FROM companies
                 WHERE is_active = 1
                 ORDER BY name", conn);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
                 list.Add(MapCompany(reader));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetAllCompanies failed."); }
@@ -1136,12 +1169,12 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         UpdatedAt          = r.GetDateTime(8)
     };
 
-    public void UpdateCompany(int id, string name, string? registrationNumber, string? contactEmail,
+    public async Task UpdateCompany(int id, string name, string? registrationNumber, string? contactEmail,
         string? contactPhone, string? address)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 UPDATE companies
                 SET name                = @name,
@@ -1157,53 +1190,56 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@email", (object?)contactEmail       ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@phone", (object?)contactPhone       ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@addr",  (object?)address            ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "UPDATE", "companies", null, $"id:{id},name:{name}");
         }
         catch (Exception ex) { _logger.LogError(ex, "UpdateCompany failed for id={Id}", id); }
     }
 
-    public void DeleteCompany(int id)
+    public async Task DeleteCompany(int id)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 UPDATE companies SET is_active = 0, updated_at = GETDATE() WHERE id = @id", conn);
             cmd.Parameters.AddWithValue("@id", id);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "DELETE", "companies", null, $"id:{id}");
         }
         catch (Exception ex) { _logger.LogError(ex, "DeleteCompany failed for id={Id}", id); }
     }
 
-    public void LinkUserToCompany(string deviceId, int? companyId)
+    public async Task LinkUserToCompany(string deviceId, int? companyId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 UPDATE user_profiles
                 SET company_id = @companyId, updated_at = GETDATE()
                 WHERE device_id = @dev AND is_active = 1", conn);
             cmd.Parameters.AddWithValue("@dev",       deviceId);
             cmd.Parameters.AddWithValue("@companyId", (object?)companyId ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
+            await LogAuditAsync(conn, "UPDATE", "user_profiles", deviceId, $"companyId:{companyId}");
         }
         catch (Exception ex) { _logger.LogError(ex, "LinkUserToCompany failed for {Device}", deviceId); }
     }
 
-    public int BackfillDeviceRecords(string deviceId)
+    public async Task<int> BackfillDeviceRecords(string deviceId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
 
             int? userId = null, companyId = null;
             using (var uCmd = new SqlCommand(
                 "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn))
             {
                 uCmd.Parameters.AddWithValue("@dev", deviceId);
-                using var rdr = uCmd.ExecuteReader();
-                if (rdr.Read())
+                await using var rdr = await uCmd.ExecuteReaderAsync();
+                if (await rdr.ReadAsync())
                 {
                     userId    = rdr.IsDBNull(0) ? null : rdr.GetInt32(0);
                     companyId = rdr.IsDBNull(1) ? null : rdr.GetInt32(1);
@@ -1229,8 +1265,9 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 upd.Parameters.AddWithValue("@dev", deviceId);
                 upd.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
                 upd.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
-                total += upd.ExecuteNonQuery();
+                total += await upd.ExecuteNonQueryAsync();
             }
+            await LogAuditAsync(conn, "UPDATE", "backfill", deviceId, $"rows:{total}");
             return total;
         }
         catch (Exception ex)
@@ -1240,19 +1277,19 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public GnssTrack? GetLatestGnssTrack(string deviceId)
+    public async Task<GnssTrack?> GetLatestGnssTrack(string deviceId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT TOP 1 id, device_id, gnss_time, longitude, latitude, loc_type, created_at
                 FROM gps_tracks
                 WHERE device_id = @dev
                 ORDER BY id DESC", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
-            using var reader = cmd.ExecuteReader();
-            if (!reader.Read()) return null;
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
             return new GnssTrack
             {
                 Id        = reader.GetInt32(0),
@@ -1271,24 +1308,24 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public IReadOnlyList<GnssTrack> GetGnssTracks(string deviceId, System.DateTime? from, System.DateTime? to)
+    public async Task<IReadOnlyList<GnssTrack>> GetGnssTracks(string deviceId, System.DateTime? from, System.DateTime? to)
     {
         var list = new List<GnssTrack>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT id, device_id, gnss_time, longitude, latitude, loc_type, created_at
                 FROM gps_tracks
                 WHERE device_id = @dev
                   AND (@from IS NULL OR created_at >= @from)
                   AND (@to   IS NULL OR created_at <= @to)
-                ORDER BY created_at ASC, id ASC", conn);
+                ORDER BY created_at DESC, id DESC", conn);
             cmd.Parameters.AddWithValue("@dev",  deviceId);
             cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
             cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
                 list.Add(new GnssTrack
                 {
@@ -1306,11 +1343,11 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         return list;
     }
 
-    public HealthSnapshot? GetLatestHealthSnapshot(string deviceId)
+    public async Task<HealthSnapshot?> GetLatestHealthSnapshot(string deviceId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT TOP 1 id, device_id, record_time, battery, rssi, steps,
                        distance, calorie, avg_hr, max_hr, min_hr,
@@ -1319,8 +1356,8 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 WHERE device_id = @dev
                 ORDER BY id DESC", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
-            using var r = cmd.ExecuteReader();
-            if (!r.Read()) return null;
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync()) return null;
             return new HealthSnapshot
             {
                 Id         = r.GetInt32(0),
@@ -1348,24 +1385,24 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public int GetActiveWorkerCount()
+    public async Task<int> GetActiveWorkerCount()
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(
                 "SELECT COUNT(*) FROM user_profiles WHERE is_active = 1", conn);
-            return (int)cmd.ExecuteScalar()!;
+            return (int)(await cmd.ExecuteScalarAsync())!;
         }
         catch (Exception ex) { _logger.LogError(ex, "GetActiveWorkerCount failed."); return 0; }
     }
 
-    public IReadOnlyList<UserProfile> GetPagedUserProfiles(int skip, int take)
+    public async Task<IReadOnlyList<UserProfile>> GetPagedUserProfiles(int skip, int take)
     {
         var list = new List<UserProfile>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
                        u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
@@ -1376,33 +1413,33 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
             cmd.Parameters.AddWithValue("@skip", skip);
             cmd.Parameters.AddWithValue("@take", take);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
                 list.Add(MapUserProfile(r));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetPagedUserProfiles failed."); }
         return list;
     }
 
-    public int GetActiveWorkerCountByCompany(int companyId)
+    public async Task<int> GetActiveWorkerCountByCompany(int companyId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(
                 "SELECT COUNT(*) FROM user_profiles WHERE is_active=1 AND company_id=@cid", conn);
             cmd.Parameters.AddWithValue("@cid", companyId);
-            return (int)cmd.ExecuteScalar()!;
+            return (int)(await cmd.ExecuteScalarAsync())!;
         }
         catch (Exception ex) { _logger.LogError(ex, "GetActiveWorkerCountByCompany failed for {Id}", companyId); return 0; }
     }
 
-    public IReadOnlyList<UserProfile> GetPagedUserProfilesByCompany(int skip, int take, int companyId)
+    public async Task<IReadOnlyList<UserProfile>> GetPagedUserProfilesByCompany(int skip, int take, int companyId)
     {
         var list = new List<UserProfile>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT u.device_id, u.user_id, u.name, u.surname, u.email, u.cell,
                        u.emp_no, u.address, u.company_id, c.name AS company_name, u.updated_at
@@ -1414,51 +1451,50 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@skip", skip);
             cmd.Parameters.AddWithValue("@take", take);
             cmd.Parameters.AddWithValue("@cid",  companyId);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
                 list.Add(MapUserProfile(r));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetPagedUserProfilesByCompany failed for {Id}", companyId); }
         return list;
     }
 
-    public int GetRecentAlarmCount(int withinHours)
+    public async Task<int> GetRecentAlarmCount(int withinHours)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT COUNT(*)
                 FROM alarms
                 WHERE created_at >= DATEADD(HOUR, -@h, GETDATE())", conn);
             cmd.Parameters.AddWithValue("@h", withinHours);
-            return (int)cmd.ExecuteScalar()!;
+            return (int)(await cmd.ExecuteScalarAsync())!;
         }
         catch (Exception ex) { _logger.LogError(ex, "GetRecentAlarmCount failed."); return 0; }
     }
 
-    public int GetRecentSosCount(int withinHours)
+    public async Task<int> GetRecentSosCount(int withinHours)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT COUNT(*)
                 FROM sos_events
                 WHERE created_at >= DATEADD(HOUR, -@h, GETDATE())", conn);
             cmd.Parameters.AddWithValue("@h", withinHours);
-            return (int)cmd.ExecuteScalar()!;
+            return (int)(await cmd.ExecuteScalarAsync())!;
         }
         catch (Exception ex) { _logger.LogError(ex, "GetRecentSosCount failed."); return 0; }
     }
 
-    public IReadOnlyList<AlarmEvent> GetRecentAlarms(int withinHours, int limit)
+    public async Task<IReadOnlyList<AlarmEvent>> GetRecentAlarms(int withinHours, int limit)
     {
         var list = new List<AlarmEvent>();
         try
         {
-            using var conn = Open(); conn.Open();
-            // Single round trip: JOIN resolves worker name; avoids loading all user profiles in the service layer
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT TOP (@limit)
                     a.id, a.device_id,
@@ -1470,8 +1506,8 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 ORDER BY a.created_at DESC", conn);
             cmd.Parameters.AddWithValue("@limit", limit);
             cmd.Parameters.AddWithValue("@h",     withinHours);
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
             {
                 list.Add(new AlarmEvent
                 {
@@ -1489,20 +1525,19 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         return list;
     }
 
-    public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCounts(int withinHours)
+    public async Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCounts(int withinHours)
     {
         try
         {
-            using var conn = Open(); conn.Open();
-            // Single round trip replaces three separate COUNT queries
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT
                     (SELECT COUNT(*) FROM user_profiles WHERE is_active = 1),
                     (SELECT COUNT(*) FROM alarms       WHERE created_at >= DATEADD(HOUR, -@h, GETDATE())),
                     (SELECT COUNT(*) FROM sos_events   WHERE created_at >= DATEADD(HOUR, -@h, GETDATE()))", conn);
             cmd.Parameters.AddWithValue("@h", withinHours);
-            using var r = cmd.ExecuteReader();
-            if (!r.Read()) return (0, 0, 0);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync()) return (0, 0, 0);
             return (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2));
         }
         catch (Exception ex)
@@ -1512,11 +1547,11 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public (int TotalWorkers, int AlarmCount, int SosCount) GetDashboardCountsByCompany(int withinHours, int companyId)
+    public async Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCountsByCompany(int withinHours, int companyId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT
                     (SELECT COUNT(*) FROM user_profiles WHERE is_active=1 AND company_id=@cid),
@@ -1524,8 +1559,8 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                     (SELECT COUNT(*) FROM sos_events   WHERE company_id=@cid AND created_at >= DATEADD(HOUR, -@h, GETDATE()))", conn);
             cmd.Parameters.AddWithValue("@h",   withinHours);
             cmd.Parameters.AddWithValue("@cid", companyId);
-            using var r = cmd.ExecuteReader();
-            if (!r.Read()) return (0, 0, 0);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync()) return (0, 0, 0);
             return (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2));
         }
         catch (Exception ex)
@@ -1537,7 +1572,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
 
     // ── GPS queries ───────────────────────────────────────────────────────────
 
-    public (IReadOnlyList<(string DeviceId, string? UserName, GnssTrack Track)> Items, int TotalCount)
+    public async Task<(IReadOnlyList<(string DeviceId, string? UserName, GnssTrack Track)> Items, int TotalCount)>
         GetGnssTracksByCompany(int companyId, System.DateTime? from, System.DateTime? to,
             int skip, int take, string sortDir, bool onlineOnly, bool offlineOnly)
     {
@@ -1546,33 +1581,41 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         try
         {
             var dir  = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
-            var sql  = $@"
-                SELECT g.device_id,
-                       CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
-                       g.id, g.gnss_time, g.longitude, g.latitude, g.loc_type, g.created_at
-                FROM gps_tracks g
-                INNER JOIN user_profiles u ON u.device_id = g.device_id AND u.is_active = 1
-                WHERE u.company_id = @cid
-                  AND (@from IS NULL OR g.created_at >= @from)
-                  AND (@to   IS NULL OR g.created_at <= @to)
-                ORDER BY g.created_at {dir}
+
+            // Latest record per device — no duplicates
+            var sql = $@"
+                WITH ranked AS (
+                    SELECT g.device_id,
+                           CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
+                           g.id, g.gnss_time, g.longitude, g.latitude, g.loc_type, g.created_at,
+                           ROW_NUMBER() OVER (PARTITION BY g.device_id ORDER BY g.id DESC) AS rn
+                    FROM gps_tracks g
+                    INNER JOIN user_profiles u ON u.device_id = g.device_id AND u.is_active = 1
+                    WHERE u.company_id = @cid
+                      AND (@from IS NULL OR g.created_at >= @from)
+                      AND (@to   IS NULL OR g.created_at <= @to)
+                )
+                SELECT device_id, user_name, id, gnss_time, longitude, latitude, loc_type, created_at
+                FROM ranked
+                WHERE rn = 1
+                ORDER BY created_at {dir}
                 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY";
 
             var countSql = @"
-                SELECT COUNT(*)
+                SELECT COUNT(DISTINCT g.device_id)
                 FROM gps_tracks g
                 INNER JOIN user_profiles u ON u.device_id = g.device_id AND u.is_active = 1
                 WHERE u.company_id = @cid
                   AND (@from IS NULL OR g.created_at >= @from)
                   AND (@to   IS NULL OR g.created_at <= @to)";
 
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using (var cmd = new SqlCommand(countSql, conn))
             {
                 cmd.Parameters.AddWithValue("@cid", companyId);
                 cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
                 cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                total = (int)cmd.ExecuteScalar()!;
+                total = (int)(await cmd.ExecuteScalarAsync())!;
             }
 
             using (var cmd = new SqlCommand(sql, conn))
@@ -1582,8 +1625,8 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
                 cmd.Parameters.AddWithValue("@skip", skip);
                 cmd.Parameters.AddWithValue("@take", take);
-                using var r = cmd.ExecuteReader();
-                while (r.Read())
+                await using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
                 {
                     var track = new GnssTrack
                     {
@@ -1603,20 +1646,20 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         return (list, total);
     }
 
-    public (int Online, int Offline) GetDeviceStatusCountsByCompany(int companyId,
+    public async Task<(int Online, int Offline)> GetDeviceStatusCountsByCompany(int companyId,
         System.Collections.Generic.IReadOnlyList<string> onlineDeviceIds)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(
                 "SELECT device_id FROM user_profiles WHERE company_id=@cid AND is_active=1", conn);
             cmd.Parameters.AddWithValue("@cid", companyId);
-            using var r = cmd.ExecuteReader();
+            await using var r = await cmd.ExecuteReaderAsync();
             int online = 0, offline = 0;
             var onlineSet = new System.Collections.Generic.HashSet<string>(
                 onlineDeviceIds, StringComparer.OrdinalIgnoreCase);
-            while (r.Read())
+            while (await r.ReadAsync())
             {
                 var did = r.GetString(0);
                 if (onlineSet.Contains(did)) online++; else offline++;
@@ -1632,7 +1675,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
 
     // ── Health queries ────────────────────────────────────────────────────────
 
-    public (IReadOnlyList<HealthSnapshot> Items, int TotalCount)
+    public async Task<(IReadOnlyList<HealthSnapshot> Items, int TotalCount)>
         GetHealthSnapshotsByDevice(string deviceId, System.DateTime? from, System.DateTime? to,
             int skip, int take, string sortDir)
     {
@@ -1641,7 +1684,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         try
         {
             var dir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
 
             using (var cmd = new SqlCommand(@"
                 SELECT COUNT(*) FROM health_snapshots
@@ -1652,7 +1695,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 cmd.Parameters.AddWithValue("@dev", deviceId);
                 cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
                 cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                total = (int)cmd.ExecuteScalar()!;
+                total = (int)(await cmd.ExecuteScalarAsync())!;
             }
 
             using (var cmd = new SqlCommand($@"
@@ -1671,15 +1714,15 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
                 cmd.Parameters.AddWithValue("@skip", skip);
                 cmd.Parameters.AddWithValue("@take", take);
-                using var r = cmd.ExecuteReader();
-                while (r.Read()) list.Add(MapHealthSnapshot(r));
+                await using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync()) list.Add(MapHealthSnapshot(r));
             }
         }
         catch (Exception ex) { _logger.LogError(ex, "GetHealthSnapshotsByDevice failed for {Device}", deviceId); }
         return (list, total);
     }
 
-    public (IReadOnlyList<(string DeviceId, string? UserName, HealthSnapshot Snapshot)> Items, int TotalCount)
+    public async Task<(IReadOnlyList<(string DeviceId, string? UserName, HealthSnapshot Snapshot)> Items, int TotalCount)>
         GetHealthSnapshotsByCompany(int companyId, System.DateTime? from, System.DateTime? to,
             int skip, int take, string sortDir)
     {
@@ -1688,10 +1731,12 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         try
         {
             var dir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
 
+            // Count distinct devices that have any record in the date window
             using (var cmd = new SqlCommand(@"
-                SELECT COUNT(*) FROM health_snapshots h
+                SELECT COUNT(DISTINCT h.device_id)
+                FROM health_snapshots h
                 INNER JOIN user_profiles u ON u.device_id=h.device_id AND u.is_active=1
                 WHERE u.company_id=@cid
                   AND (@from IS NULL OR h.created_at >= @from)
@@ -1700,21 +1745,29 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 cmd.Parameters.AddWithValue("@cid", companyId);
                 cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
                 cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                total = (int)cmd.ExecuteScalar()!;
+                total = (int)(await cmd.ExecuteScalarAsync())!;
             }
 
+            // Return only the latest record per device (ROW_NUMBER rn=1) within the date window
             using (var cmd = new SqlCommand($@"
-                SELECT h.id, h.device_id,
-                       CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END,
-                       h.record_time, h.battery, h.rssi, h.steps,
-                       h.distance, h.calorie, h.avg_hr, h.max_hr, h.min_hr,
-                       h.avg_spo2, h.sbp, h.dbp, h.fatigue, h.created_at
-                FROM health_snapshots h
-                INNER JOIN user_profiles u ON u.device_id=h.device_id AND u.is_active=1
-                WHERE u.company_id=@cid
-                  AND (@from IS NULL OR h.created_at >= @from)
-                  AND (@to   IS NULL OR h.created_at <= @to)
-                ORDER BY h.created_at {dir}
+                WITH ranked AS (
+                    SELECT h.id, h.device_id, h.record_time, h.battery, h.rssi, h.steps,
+                           h.distance, h.calorie, h.avg_hr, h.max_hr, h.min_hr,
+                           h.avg_spo2, h.sbp, h.dbp, h.fatigue, h.created_at,
+                           CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
+                           ROW_NUMBER() OVER (PARTITION BY h.device_id ORDER BY h.id DESC) AS rn
+                    FROM health_snapshots h
+                    INNER JOIN user_profiles u ON u.device_id=h.device_id AND u.is_active=1
+                    WHERE u.company_id=@cid
+                      AND (@from IS NULL OR h.created_at >= @from)
+                      AND (@to   IS NULL OR h.created_at <= @to)
+                )
+                SELECT id, device_id, user_name, record_time, battery, rssi, steps,
+                       distance, calorie, avg_hr, max_hr, min_hr,
+                       avg_spo2, sbp, dbp, fatigue, created_at
+                FROM ranked
+                WHERE rn = 1
+                ORDER BY created_at {dir}
                 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn))
             {
                 cmd.Parameters.AddWithValue("@cid", companyId);
@@ -1722,8 +1775,11 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
                 cmd.Parameters.AddWithValue("@skip", skip);
                 cmd.Parameters.AddWithValue("@take", take);
-                using var r = cmd.ExecuteReader();
-                while (r.Read())
+                // columns: 0=id, 1=device_id, 2=user_name, 3=record_time, 4=battery,
+                //          5=rssi, 6=steps, 7=distance, 8=calorie, 9=avg_hr,
+                //          10=max_hr, 11=min_hr, 12=avg_spo2, 13=sbp, 14=dbp, 15=fatigue, 16=created_at
+                await using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
                 {
                     var snap = new HealthSnapshot
                     {
@@ -1752,14 +1808,14 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         return (list, total);
     }
 
-    public IReadOnlyList<(string DeviceId, string? UserName, double? AvgHr, double? AvgSpo2,
-        double? AvgFatigue, int? MaxHr, int? MinHr, int? TotalSteps, int Count)>
+    public async Task<IReadOnlyList<(string DeviceId, string? UserName, double? AvgHr, double? AvgSpo2,
+        double? AvgFatigue, int? MaxHr, int? MinHr, int? TotalSteps, int Count)>>
         GetHealthSummaryByCompany(int companyId, System.DateTime? from, System.DateTime? to)
     {
         var list = new List<(string, string?, double?, double?, double?, int?, int?, int?, int)>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT h.device_id,
                        CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
@@ -1776,8 +1832,8 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@cid", companyId);
             cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
             cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
             {
                 list.Add((
                     r.GetString(0),
@@ -1807,21 +1863,21 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                  gs.updated_at, lg.updated_at, aaf.updated_at, bpa.updated_at) AS last_updated,
         df.gps_auto_check, df.gps_interval_time, df.power_mode,
         lf.data_auto_upload, lf.data_upload_interval, lf.auto_locate, lf.locate_interval_time,
-        ha.open  AS hr_alarm_open,  ha.high AS hr_alarm_high, ha.low AS hr_alarm_low,
+        ha.[open]  AS hr_alarm_open,  ha.high AS hr_alarm_high, ha.low AS hr_alarm_low,
         ha.threshold, ha.alarm_interval,
-        dha.open AS dyn_hr_open, dha.high AS dyn_hr_high, dha.low AS dyn_hr_low,
+        dha.[open] AS dyn_hr_open, dha.high AS dyn_hr_high, dha.low AS dyn_hr_low,
         dha.timeout, dha.interval AS dyn_hr_interval,
-        sa.open  AS spo2_open,  sa.low  AS spo2_low,
-        ba.open  AS bp_open,    ba.sbp_high, ba.sbp_below, ba.dbp_high, ba.dbp_below,
-        ta.open  AS temp_open,  ta.high AS temp_high, ta.low AS temp_low,
+        sa.[open]  AS spo2_open,  sa.low  AS spo2_low,
+        ba.[open]  AS bp_open,    ba.sbp_high, ba.sbp_below, ba.dbp_high, ba.dbp_below,
+        ta.[open]  AS temp_open,  ta.high AS temp_high, ta.low AS temp_low,
         fs.fall_check, fs.fall_threshold,
         dd.language, dd.hour_format, dd.date_format, dd.distance_unit, dd.temperature_unit, dd.wear_hand_right,
         hi.interval AS hr_interval,
         oi.interval AS other_interval,
         dg.step, dg.distance AS goal_distance, dg.calorie AS goal_calorie,
         gs.gps_auto_check AS gps_locate_auto, gs.gps_interval_time AS gps_locate_interval, gs.run_gps,
-        lg.open AS lcd_open, lg.start_hour AS lcd_start, lg.end_hour AS lcd_end,
-        aaf.open AS af_open, aaf.interval AS af_interval,
+        lg.[open] AS lcd_open, lg.start_hour AS lcd_start, lg.end_hour AS lcd_end,
+        aaf.[open] AS af_open, aaf.interval AS af_interval,
         bpa.sbp_band, bpa.dbp_band, bpa.sbp_meter, bpa.dbp_meter";
 
     private static readonly string DeviceConfigJoins = @"
@@ -1885,7 +1941,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         );
     }
 
-    public (string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+    public async Task<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
         bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
         bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
         bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
@@ -1900,20 +1956,20 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
         bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
         bool? AutoAfOpen, int? AutoAfInterval,
-        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)?
+        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)?>
         GetDeviceConfig(string deviceId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand($@"
                 SELECT {DeviceConfigSelectCols}
                 FROM user_profiles u
                 {DeviceConfigJoins}
                 WHERE u.device_id = @dev AND u.is_active = 1", conn);
             cmd.Parameters.AddWithValue("@dev", deviceId);
-            using var r = cmd.ExecuteReader();
-            if (!r.Read()) return null;
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync()) return null;
             return MapDeviceConfigRow(r);
         }
         catch (Exception ex)
@@ -1923,7 +1979,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         }
     }
 
-    public IReadOnlyList<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
+    public async Task<IReadOnlyList<(string DeviceId, string? UserName, System.DateTime? UpdatedAt,
         bool? GpsAutoCheck, int? GpsIntervalTime, int? PowerMode,
         bool? DataAutoUpload, int? DataUploadInterval, bool? AutoLocate, int? LocateIntervalTime,
         bool? HrAlarmOpen, int? HrAlarmHigh, int? HrAlarmLow, int? HrAlarmThreshold, int? HrAlarmInterval,
@@ -1938,7 +1994,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         bool? GpsLocateAutoCheck, int? GpsLocateIntervalTime, bool? RunGps,
         bool? LcdGestureOpen, int? LcdGestureStartHour, int? LcdGestureEndHour,
         bool? AutoAfOpen, int? AutoAfInterval,
-        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)>
+        double? BpSbpBand, double? BpDbpBand, double? BpSbpMeter, double? BpDbpMeter)>>
         GetDeviceConfigsByCompany(int companyId, int skip, int take)
     {
         var list = new List<(string, string?, System.DateTime?,
@@ -1958,7 +2014,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             double?, double?, double?, double?)>();
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand($@"
                 SELECT {DeviceConfigSelectCols}
                 FROM user_profiles u
@@ -1969,22 +2025,22 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@cid",  companyId);
             cmd.Parameters.AddWithValue("@skip", skip);
             cmd.Parameters.AddWithValue("@take", take);
-            using var r = cmd.ExecuteReader();
-            while (r.Read()) list.Add(MapDeviceConfigRow(r));
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync()) list.Add(MapDeviceConfigRow(r));
         }
         catch (Exception ex) { _logger.LogError(ex, "GetDeviceConfigsByCompany failed for company {Id}", companyId); }
         return list;
     }
 
-    public int GetDeviceConfigCountByCompany(int companyId)
+    public async Task<int> GetDeviceConfigCountByCompany(int companyId)
     {
         try
         {
-            using var conn = Open(); conn.Open();
+            await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(
                 "SELECT COUNT(*) FROM user_profiles WHERE company_id=@cid AND is_active=1", conn);
             cmd.Parameters.AddWithValue("@cid", companyId);
-            return (int)cmd.ExecuteScalar()!;
+            return (int)(await cmd.ExecuteScalarAsync())!;
         }
         catch (Exception ex) { _logger.LogError(ex, "GetDeviceConfigCountByCompany failed for company {Id}", companyId); return 0; }
     }
@@ -2008,6 +2064,88 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         Fatigue    = r.IsDBNull(14) ? null : r.GetInt32(14),
         CreatedAt  = r.GetDateTime(15)
     };
+
+    // ── Audit helpers ─────────────────────────────────────────────────────────
+
+    private async Task LogAuditAsync(SqlConnection conn, string action, string tableName,
+        string? deviceId = null, string? details = null)
+    {
+        try
+        {
+            using var cmd = new SqlCommand(
+                "INSERT INTO audit_log (action, table_name, device_id, details) VALUES (@a, @t, @d, @det)", conn);
+            cmd.Parameters.AddWithValue("@a",   action);
+            cmd.Parameters.AddWithValue("@t",   tableName);
+            cmd.Parameters.AddWithValue("@d",   (object?)deviceId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@det", (object?)details  ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Audit log write failed for {Action}/{Table}", action, tableName);
+        }
+    }
+
+    public async Task<(IReadOnlyList<AuditEntry> Items, int TotalCount)> GetAuditLog(
+        string? deviceId = null,
+        string? action = null,
+        string? tableName = null,
+        System.DateTime? from = null,
+        System.DateTime? to = null,
+        int skip = 0,
+        int take = 50)
+    {
+        var items = new List<AuditEntry>();
+        int total = 0;
+        try
+        {
+            await using var conn = await OpenAsync();
+
+            const string where = @"
+                WHERE (@dev    IS NULL OR device_id  = @dev)
+                  AND (@action IS NULL OR action     = @action)
+                  AND (@table  IS NULL OR table_name = @table)
+                  AND (@from   IS NULL OR occurred_at >= @from)
+                  AND (@to     IS NULL OR occurred_at <= @to)";
+
+            using (var countCmd = new SqlCommand("SELECT COUNT(*) FROM audit_log" + where, conn))
+            {
+                countCmd.Parameters.AddWithValue("@dev",    (object?)deviceId  ?? DBNull.Value);
+                countCmd.Parameters.AddWithValue("@action", (object?)action    ?? DBNull.Value);
+                countCmd.Parameters.AddWithValue("@table",  (object?)tableName ?? DBNull.Value);
+                countCmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+                countCmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+                total = (int)(await countCmd.ExecuteScalarAsync())!;
+            }
+
+            using var cmd = new SqlCommand(@"
+                SELECT id, action, table_name, device_id, details, occurred_at
+                FROM audit_log" + where + @"
+                ORDER BY occurred_at DESC
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
+            cmd.Parameters.AddWithValue("@dev",    (object?)deviceId  ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@action", (object?)action    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@table",  (object?)tableName ?? DBNull.Value);
+            cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+            cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                items.Add(new AuditEntry
+                {
+                    Id         = reader.GetInt64(0),
+                    Action     = reader.GetString(1),
+                    TableName  = reader.GetString(2),
+                    DeviceId   = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    Details    = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    OccurredAt = reader.GetDateTime(5)
+                });
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetAuditLog failed."); }
+        return (items, total);
+    }
 
     public void Dispose() { }
 }

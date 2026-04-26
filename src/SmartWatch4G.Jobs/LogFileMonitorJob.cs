@@ -19,9 +19,5 @@ public sealed class LogFileMonitorJob : IJob
         _worker = worker;
     }
 
-    public Task Execute(IJobExecutionContext context)
-    {
-        _worker.Execute();
-        return Task.CompletedTask;
-    }
+    public Task Execute(IJobExecutionContext context) => _worker.Execute();
 }

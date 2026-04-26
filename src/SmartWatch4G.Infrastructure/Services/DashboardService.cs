@@ -19,27 +19,26 @@ public sealed class DashboardService : IDashboardService
         _logger = logger;
     }
 
-    public Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync(int? companyId = null)
+    public async Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync(int? companyId = null)
     {
         try
         {
             var (workers, alarms, sos) = companyId.HasValue
-                ? _db.GetDashboardCountsByCompany(AlertWindowHours, companyId.Value)
-                : _db.GetDashboardCounts(AlertWindowHours);
+                ? await _db.GetDashboardCountsByCompany(AlertWindowHours, companyId.Value)
+                : await _db.GetDashboardCounts(AlertWindowHours);
 
-            return Task.FromResult(ServiceResult<DashboardSummaryResponse>.Ok(new DashboardSummaryResponse
+            return ServiceResult<DashboardSummaryResponse>.Ok(new DashboardSummaryResponse
             {
                 TotalWorkers      = workers,
                 ActiveAlerts      = alarms,
                 SosCount          = sos,
                 WorkersInDistress = sos
-            }));
+            });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetSummaryAsync failed");
-            return Task.FromResult(
-                ServiceResult<DashboardSummaryResponse>.Fail("An unexpected error occurred.", 500));
+            return ServiceResult<DashboardSummaryResponse>.Fail("An unexpected error occurred.", 500);
         }
     }
 }

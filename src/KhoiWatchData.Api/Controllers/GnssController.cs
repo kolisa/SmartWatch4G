@@ -46,7 +46,10 @@ public sealed class GnssController : ControllerBase
         if (string.IsNullOrWhiteSpace(deviceId))
             return BadRequest(new { message = "Device ID is required." });
 
-        if (from.HasValue && to.HasValue && from.Value > to.Value)
+        from ??= System.DateTime.Today;
+        to   ??= System.DateTime.Today.AddDays(1).AddTicks(-1);
+
+        if (from.Value > to.Value)
             return BadRequest(new { message = "'from' must be earlier than or equal to 'to'." });
 
         var result = await _gnssService.GetTrackHistoryAsync(deviceId, from, to);

@@ -34,7 +34,7 @@ public sealed class DeviceStatusPollingJob : IJob
 
     public async Task Execute(IJobExecutionContext context)
     {
-        var profiles = _db.GetAllUserProfiles();
+        var profiles = await _db.GetAllUserProfiles();
         if (profiles.Count == 0) return;
 
         _logger.LogDebug("DeviceStatusPollingJob: polling {Count} devices", profiles.Count);

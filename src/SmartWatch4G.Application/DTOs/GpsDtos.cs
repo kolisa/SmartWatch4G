@@ -12,8 +12,8 @@ public sealed class GpsQueryParams
     [Range(1, 500, ErrorMessage = "PageSize must be between 1 and 500.")]
     public int PageSize { get; init; } = 50;
 
-    public DateTime? From { get; init; }
-    public DateTime? To   { get; init; }
+    public DateTime? From { get; init; } = DateTime.Today;
+    public DateTime? To   { get; init; } = DateTime.Today.AddDays(1).AddTicks(-1);
 
     /// <summary>Sort by "time" (default) or "device".</summary>
     public string SortBy { get; init; } = "time";

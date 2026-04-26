@@ -191,7 +191,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_hr_alarm')
 CREATE TABLE device_hr_alarm (
     device_id      NVARCHAR(50) PRIMARY KEY,
-    open           BIT          NULL,
+    [open]         BIT          NULL,
     high           INT          NULL,
     low            INT          NULL,
     threshold      INT          NULL,
@@ -206,7 +206,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_dynamic_hr_alarm')
 CREATE TABLE device_dynamic_hr_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     high       INT          NULL,
     low        INT          NULL,
     timeout    INT          NULL,
@@ -221,7 +221,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_spo2_alarm')
 CREATE TABLE device_spo2_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     low        INT          NULL,
     user_id    INT          NULL,
     company_id INT          NULL,
@@ -233,7 +233,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_bp_alarm')
 CREATE TABLE device_bp_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     sbp_high   INT          NULL,
     sbp_below  INT          NULL,
     dbp_high   INT          NULL,
@@ -248,7 +248,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_temp_alarm')
 CREATE TABLE device_temp_alarm (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     high       INT          NULL,
     low        INT          NULL,
     user_id    INT          NULL,
@@ -324,7 +324,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_auto_af')
 CREATE TABLE device_auto_af (
     device_id       NVARCHAR(50) PRIMARY KEY,
-    open            BIT          NULL,
+    [open]          BIT          NULL,
     interval        INT          NULL,
     rri_single_time BIT          NULL,
     rri_type        INT          NULL,
@@ -370,7 +370,7 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'device_lcd_gesture')
 CREATE TABLE device_lcd_gesture (
     device_id  NVARCHAR(50) PRIMARY KEY,
-    open       BIT          NULL,
+    [open]     BIT          NULL,
     start_hour INT          NULL,
     end_hour   INT          NULL,
     user_id    INT          NULL,
@@ -409,6 +409,8 @@ CREATE TABLE device_clock_alarms (
     hour       INT           NOT NULL,
     minute     INT           NOT NULL,
     title      NVARCHAR(100) NULL,
+    user_id    INT           NULL,
+    company_id INT           NULL,
     created_at DATETIME2     DEFAULT GETDATE()
 );
 GO

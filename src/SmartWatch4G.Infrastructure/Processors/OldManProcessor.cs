@@ -16,7 +16,7 @@ public class OldManProcessor
         _db = db;
     }
 
-    public void ProceedOldMan(byte[] pbData, string deviceId = "")
+    public async Task ProceedOldMan(byte[] pbData, string deviceId = "")
     {
         OM0Report omInfo;
         try
@@ -41,7 +41,7 @@ public class OldManProcessor
         _logger.LogInformation("----{Time} battery:{Battery}, rssi:{Rssi}", rtTimeStr, battery, rssi);
 
         if (!string.IsNullOrEmpty(deviceId))
-            _db.UpsertHealthSnapshot(deviceId, rtTimeStr, battery: battery, rssi: rssi);
+            await _db.UpsertHealthSnapshot(deviceId, rtTimeStr, battery: battery, rssi: rssi);
 
         if (omInfo.Health != null)
         {
@@ -54,11 +54,10 @@ public class OldManProcessor
                 rtTimeStr, step, distance, calorie);
 
             if (!string.IsNullOrEmpty(deviceId))
-                _db.UpsertHealthSnapshot(deviceId, rtTimeStr,
+                await _db.UpsertHealthSnapshot(deviceId, rtTimeStr,
                     steps: step, distance: distance, calorie: calorie);
         }
 
-        // gnss location — WGS-84 coordinate system (not GCJ-02)
         var trackList = omInfo.TrackData;
         if (trackList != null && trackList.Count > 0)
         {
@@ -73,7 +72,7 @@ public class OldManProcessor
                     gnssTimeStr, track.Gnss.Longitude, track.Gnss.Latitude, locateType);
 
                 if (!string.IsNullOrEmpty(deviceId))
-                    _db.InsertGpsTrack(deviceId, gnssTimeStr,
+                    await _db.InsertGpsTrack(deviceId, gnssTimeStr,
                         track.Gnss.Longitude, track.Gnss.Latitude, locateType);
             }
         }

@@ -18,23 +18,28 @@ public class DeviceSettingsService : IDeviceSettingsService
             ?? throw new InvalidOperationException("Connection string 'SmartWatch' not found.");
     }
 
-    private SqlConnection Open() { var c = new SqlConnection(_connStr); c.Open(); return c; }
+    private async Task<SqlConnection> OpenAsync()
+    {
+        var c = new SqlConnection(_connStr);
+        await c.OpenAsync();
+        return c;
+    }
 
-    private void Exec(string sql, Action<SqlCommand> bind, string ctx)
+    private async Task ExecAsync(string sql, Action<SqlCommand> bind, string ctx)
     {
         try
         {
-            using var conn = Open();
-            using var cmd  = new SqlCommand(sql, conn);
+            await using var conn = await OpenAsync();
+            await using var cmd  = new SqlCommand(sql, conn);
             bind(cmd);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
         }
         catch (Exception ex) { _logger.LogError(ex, "{Ctx} failed", ctx); }
     }
 
     // ── single-row-per-device helpers ──────────────────────────────────────────
 
-    public void SaveUserInfo(UserInfoRequest r) => Exec(@"
+    public Task SaveUserInfo(UserInfoRequest r) => ExecAsync(@"
         MERGE device_user_info AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -56,7 +61,7 @@ public class DeviceSettingsService : IDeviceSettingsService
                c.Parameters.AddWithValue("@hp", (object?)r.hypertension ?? DBNull.Value); },
         "SaveUserInfo");
 
-    public void SaveFallCheck(FallCheckRequest r) => Exec(@"
+    public Task SaveFallCheck(FallCheckRequest r) => ExecAsync(@"
         MERGE device_fall_settings AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -70,7 +75,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@fc", r.fall_check); },
         "SaveFallCheck");
 
-    public void SaveFallCheckSensitivity(FallCheckSensitivityRequest r) => Exec(@"
+    public Task SaveFallCheckSensitivity(FallCheckSensitivityRequest r) => ExecAsync(@"
         MERGE device_fall_settings AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -84,7 +89,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@ft", r.fall_threshold); },
         "SaveFallCheckSensitivity");
 
-    public void SaveDataFreq(DataFreqRequest r) => Exec(@"
+    public Task SaveDataFreq(DataFreqRequest r) => ExecAsync(@"
         MERGE device_data_freq AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -102,7 +107,7 @@ public class DeviceSettingsService : IDeviceSettingsService
                c.Parameters.AddWithValue("@pm", (object?)r.power_mode ?? DBNull.Value); },
         "SaveDataFreq");
 
-    public void SaveLocateDataUploadFreq(LocateDataUploadFreqRequest r) => Exec(@"
+    public Task SaveLocateDataUploadFreq(LocateDataUploadFreqRequest r) => ExecAsync(@"
         MERGE device_locate_freq AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -122,22 +127,22 @@ public class DeviceSettingsService : IDeviceSettingsService
                c.Parameters.AddWithValue("@pm", (object?)r.power_mode ?? DBNull.Value); },
         "SaveLocateDataUploadFreq");
 
-    public void SaveLcdGesture(LcdGestureRequest r) => Exec(@"
+    public Task SaveLcdGesture(LcdGestureRequest r) => ExecAsync(@"
         MERGE device_lcd_gesture AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
             FROM (VALUES(1)) AS x(dummy)
             LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
         ) AS s ON t.device_id = s.device_id
-        WHEN MATCHED THEN UPDATE SET open=@o, start_hour=@sh, end_hour=@eh,
+        WHEN MATCHED THEN UPDATE SET [open]=@o, start_hour=@sh, end_hour=@eh,
             user_id=COALESCE(s.user_id,t.user_id), company_id=COALESCE(s.company_id,t.company_id), updated_at=GETDATE()
-        WHEN NOT MATCHED THEN INSERT (device_id,user_id,company_id,open,start_hour,end_hour)
+        WHEN NOT MATCHED THEN INSERT (device_id,user_id,company_id,[open],start_hour,end_hour)
             VALUES(s.device_id,s.user_id,s.company_id,@o,@sh,@eh);",
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@o", r.open);
                c.Parameters.AddWithValue("@sh", r.start_hour); c.Parameters.AddWithValue("@eh", r.end_hour); },
         "SaveLcdGesture");
 
-    public void SaveHrAlarm(HrAlarmRequest r) => Exec(@"
+    public Task SaveHrAlarm(HrAlarmRequest r) => ExecAsync(@"
         MERGE device_hr_alarm AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -145,17 +150,17 @@ public class DeviceSettingsService : IDeviceSettingsService
             LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
         ) AS s ON t.device_id = s.device_id
         WHEN MATCHED THEN UPDATE SET
-            open=@o, high=@h, low=@l, threshold=@th, alarm_interval=@ai,
+            [open]=@o, high=@h, low=@l, threshold=@th, alarm_interval=@ai,
             user_id=COALESCE(s.user_id,t.user_id), company_id=COALESCE(s.company_id,t.company_id), updated_at=GETDATE()
         WHEN NOT MATCHED THEN INSERT
-            (device_id,user_id,company_id,open,high,low,threshold,alarm_interval)
+            (device_id,user_id,company_id,[open],high,low,threshold,alarm_interval)
             VALUES(s.device_id,s.user_id,s.company_id,@o,@h,@l,@th,@ai);",
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@o", r.open);
                c.Parameters.AddWithValue("@h", r.high); c.Parameters.AddWithValue("@l", r.low);
                c.Parameters.AddWithValue("@th", r.threshold); c.Parameters.AddWithValue("@ai", r.alarm_interval); },
         "SaveHrAlarm");
 
-    public void SaveDynamicHrAlarm(DynamicHrAlarmRequest r) => Exec(@"
+    public Task SaveDynamicHrAlarm(DynamicHrAlarmRequest r) => ExecAsync(@"
         MERGE device_dynamic_hr_alarm AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -163,32 +168,32 @@ public class DeviceSettingsService : IDeviceSettingsService
             LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
         ) AS s ON t.device_id = s.device_id
         WHEN MATCHED THEN UPDATE SET
-            open=@o, high=@h, low=@l, timeout=@to, interval=@iv,
+            [open]=@o, high=@h, low=@l, timeout=@to, interval=@iv,
             user_id=COALESCE(s.user_id,t.user_id), company_id=COALESCE(s.company_id,t.company_id), updated_at=GETDATE()
         WHEN NOT MATCHED THEN INSERT
-            (device_id,user_id,company_id,open,high,low,timeout,interval)
+            (device_id,user_id,company_id,[open],high,low,timeout,interval)
             VALUES(s.device_id,s.user_id,s.company_id,@o,@h,@l,@to,@iv);",
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@o", r.open);
                c.Parameters.AddWithValue("@h", r.high); c.Parameters.AddWithValue("@l", r.low);
                c.Parameters.AddWithValue("@to", r.timeout); c.Parameters.AddWithValue("@iv", r.interval); },
         "SaveDynamicHrAlarm");
 
-    public void SaveSpo2Alarm(Spo2AlarmRequest r) => Exec(@"
+    public Task SaveSpo2Alarm(Spo2AlarmRequest r) => ExecAsync(@"
         MERGE device_spo2_alarm AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
             FROM (VALUES(1)) AS x(dummy)
             LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
         ) AS s ON t.device_id = s.device_id
-        WHEN MATCHED THEN UPDATE SET open=@o, low=@l,
+        WHEN MATCHED THEN UPDATE SET [open]=@o, low=@l,
             user_id=COALESCE(s.user_id,t.user_id), company_id=COALESCE(s.company_id,t.company_id), updated_at=GETDATE()
-        WHEN NOT MATCHED THEN INSERT (device_id,user_id,company_id,open,low)
+        WHEN NOT MATCHED THEN INSERT (device_id,user_id,company_id,[open],low)
             VALUES(s.device_id,s.user_id,s.company_id,@o,@l);",
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@o", r.open);
                c.Parameters.AddWithValue("@l", r.low); },
         "SaveSpo2Alarm");
 
-    public void SaveBpAlarm(BpAlarmRequest r) => Exec(@"
+    public Task SaveBpAlarm(BpAlarmRequest r) => ExecAsync(@"
         MERGE device_bp_alarm AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -196,32 +201,32 @@ public class DeviceSettingsService : IDeviceSettingsService
             LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
         ) AS s ON t.device_id = s.device_id
         WHEN MATCHED THEN UPDATE SET
-            open=@o, sbp_high=@sh, sbp_below=@sb, dbp_high=@dh, dbp_below=@db,
+            [open]=@o, sbp_high=@sh, sbp_below=@sb, dbp_high=@dh, dbp_below=@db,
             user_id=COALESCE(s.user_id,t.user_id), company_id=COALESCE(s.company_id,t.company_id), updated_at=GETDATE()
         WHEN NOT MATCHED THEN INSERT
-            (device_id,user_id,company_id,open,sbp_high,sbp_below,dbp_high,dbp_below)
+            (device_id,user_id,company_id,[open],sbp_high,sbp_below,dbp_high,dbp_below)
             VALUES(s.device_id,s.user_id,s.company_id,@o,@sh,@sb,@dh,@db);",
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@o", r.open);
                c.Parameters.AddWithValue("@sh", r.sbp_high); c.Parameters.AddWithValue("@sb", r.sbp_below);
                c.Parameters.AddWithValue("@dh", r.dbp_high); c.Parameters.AddWithValue("@db", r.dbp_below); },
         "SaveBpAlarm");
 
-    public void SaveTemperatureAlarm(TemperatureAlarmRequest r) => Exec(@"
+    public Task SaveTemperatureAlarm(TemperatureAlarmRequest r) => ExecAsync(@"
         MERGE device_temp_alarm AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
             FROM (VALUES(1)) AS x(dummy)
             LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
         ) AS s ON t.device_id = s.device_id
-        WHEN MATCHED THEN UPDATE SET open=@o, high=@h, low=@l,
+        WHEN MATCHED THEN UPDATE SET [open]=@o, high=@h, low=@l,
             user_id=COALESCE(s.user_id,t.user_id), company_id=COALESCE(s.company_id,t.company_id), updated_at=GETDATE()
-        WHEN NOT MATCHED THEN INSERT (device_id,user_id,company_id,open,high,low)
+        WHEN NOT MATCHED THEN INSERT (device_id,user_id,company_id,[open],high,low)
             VALUES(s.device_id,s.user_id,s.company_id,@o,@h,@l);",
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@o", r.open);
                c.Parameters.AddWithValue("@h", r.high); c.Parameters.AddWithValue("@l", r.low); },
         "SaveTemperatureAlarm");
 
-    public void SaveAutoAf(AutoAfRequest r) => Exec(@"
+    public Task SaveAutoAf(AutoAfRequest r) => ExecAsync(@"
         MERGE device_auto_af AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -229,10 +234,10 @@ public class DeviceSettingsService : IDeviceSettingsService
             LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
         ) AS s ON t.device_id = s.device_id
         WHEN MATCHED THEN UPDATE SET
-            open=@o, interval=@iv, rri_single_time=@rst, rri_type=@rt,
+            [open]=@o, interval=@iv, rri_single_time=@rst, rri_type=@rt,
             user_id=COALESCE(s.user_id,t.user_id), company_id=COALESCE(s.company_id,t.company_id), updated_at=GETDATE()
         WHEN NOT MATCHED THEN INSERT
-            (device_id,user_id,company_id,open,interval,rri_single_time,rri_type)
+            (device_id,user_id,company_id,[open],interval,rri_single_time,rri_type)
             VALUES(s.device_id,s.user_id,s.company_id,@o,@iv,@rst,@rt);",
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@o", r.open);
                c.Parameters.AddWithValue("@iv", r.interval);
@@ -240,7 +245,7 @@ public class DeviceSettingsService : IDeviceSettingsService
                c.Parameters.AddWithValue("@rt", (object?)r.rri_type ?? DBNull.Value); },
         "SaveAutoAf");
 
-    public void SaveGoal(GoalRequest r) => Exec(@"
+    public Task SaveGoal(GoalRequest r) => ExecAsync(@"
         MERGE device_goal AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -255,7 +260,7 @@ public class DeviceSettingsService : IDeviceSettingsService
                c.Parameters.AddWithValue("@d", r.distance); c.Parameters.AddWithValue("@c", r.calorie); },
         "SaveGoal");
 
-    public void SaveLanguage(LanguageRequest r) => Exec(@"
+    public Task SaveLanguage(LanguageRequest r) => ExecAsync(@"
         MERGE device_display AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -269,7 +274,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@l", r.language); },
         "SaveLanguage");
 
-    public void SaveTimeFormat(TimeFormatRequest r) => Exec(@"
+    public Task SaveTimeFormat(TimeFormatRequest r) => ExecAsync(@"
         MERGE device_display AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -283,7 +288,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@hf", r.hour_format); },
         "SaveTimeFormat");
 
-    public void SaveDateFormat(DateFormatRequest r) => Exec(@"
+    public Task SaveDateFormat(DateFormatRequest r) => ExecAsync(@"
         MERGE device_display AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -297,7 +302,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@df", r.date_format); },
         "SaveDateFormat");
 
-    public void SaveDistanceUnit(DistanceUnitRequest r) => Exec(@"
+    public Task SaveDistanceUnit(DistanceUnitRequest r) => ExecAsync(@"
         MERGE device_display AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -311,7 +316,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@du", r.distance_unit); },
         "SaveDistanceUnit");
 
-    public void SaveTemperatureUnit(TemperatureUnitRequest r) => Exec(@"
+    public Task SaveTemperatureUnit(TemperatureUnitRequest r) => ExecAsync(@"
         MERGE device_display AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -325,7 +330,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@tu", r.temperature_unit); },
         "SaveTemperatureUnit");
 
-    public void SaveWearHand(WearHandRequest r) => Exec(@"
+    public Task SaveWearHand(WearHandRequest r) => ExecAsync(@"
         MERGE device_display AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -339,7 +344,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@wh", r.right); },
         "SaveWearHand");
 
-    public void SaveBpAdjust(BpAdjustRequest r) => Exec(@"
+    public Task SaveBpAdjust(BpAdjustRequest r) => ExecAsync(@"
         MERGE device_bp_adjust AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -357,7 +362,7 @@ public class DeviceSettingsService : IDeviceSettingsService
                c.Parameters.AddWithValue("@dm", r.dbp_meter); },
         "SaveBpAdjust");
 
-    public void SaveHrInterval(HrIntervalRequest r) => Exec(@"
+    public Task SaveHrInterval(HrIntervalRequest r) => ExecAsync(@"
         MERGE device_hr_interval AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -371,7 +376,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@iv", r.interval); },
         "SaveHrInterval");
 
-    public void SaveOtherInterval(OtherIntervalRequest r) => Exec(@"
+    public Task SaveOtherInterval(OtherIntervalRequest r) => ExecAsync(@"
         MERGE device_other_interval AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -385,7 +390,7 @@ public class DeviceSettingsService : IDeviceSettingsService
         c => { c.Parameters.AddWithValue("@dev", r.device_id); c.Parameters.AddWithValue("@iv", r.interval); },
         "SaveOtherInterval");
 
-    public void SaveGpsLocate(GpsLocateRequest r) => Exec(@"
+    public Task SaveGpsLocate(GpsLocateRequest r) => ExecAsync(@"
         MERGE device_gps_settings AS t
         USING (
             SELECT @dev AS device_id, u.user_id, u.company_id
@@ -402,161 +407,184 @@ public class DeviceSettingsService : IDeviceSettingsService
                c.Parameters.AddWithValue("@git", r.gps_interval_time); c.Parameters.AddWithValue("@rg", r.run_gps); },
         "SaveGpsLocate");
 
-    // ── multi-row tables: delete + reinsert ────────────────────────────────────
+    // ── multi-row tables: delete + reinsert (transactional) ───────────────────
 
-    public void SavePhonebook(PhonebookSyncRequest r)
+    public async Task SavePhonebook(PhonebookSyncRequest r)
     {
         try
         {
-            using var conn = Open();
-            // Resolve user link once for all inserts
-            using var uCmd = new SqlCommand(
-                "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn);
-            uCmd.Parameters.AddWithValue("@dev", r.device_id);
-            using var uRdr = uCmd.ExecuteReader();
-            int? userId = null; int? companyId = null;
-            if (uRdr.Read())
+            await using var conn = await OpenAsync();
+            using var tx = conn.BeginTransaction();
+            try
             {
-                userId    = uRdr.IsDBNull(0) ? null : uRdr.GetInt32(0);
-                companyId = uRdr.IsDBNull(1) ? null : uRdr.GetInt32(1);
+                await using var uCmd = new SqlCommand(
+                    "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn, tx);
+                uCmd.Parameters.AddWithValue("@dev", r.device_id);
+                await using var uRdr = await uCmd.ExecuteReaderAsync();
+                int? userId = null; int? companyId = null;
+                if (await uRdr.ReadAsync())
+                {
+                    userId    = uRdr.IsDBNull(0) ? null : uRdr.GetInt32(0);
+                    companyId = uRdr.IsDBNull(1) ? null : uRdr.GetInt32(1);
+                }
+                await uRdr.CloseAsync();
+
+                await using var del = new SqlCommand("DELETE FROM device_phonebook WHERE device_id=@dev", conn, tx);
+                del.Parameters.AddWithValue("@dev", r.device_id);
+                await del.ExecuteNonQueryAsync();
+
+                foreach (var contact in r.phone_book.DistinctBy(c => c.number))
+                {
+                    await using var ins = new SqlCommand(@"
+                        INSERT INTO device_phonebook (device_id,name,number,sos,user_id,company_id)
+                        VALUES (@dev,@n,@num,@s,@uid,@cid)", conn, tx);
+                    ins.Parameters.AddWithValue("@dev", r.device_id);
+                    ins.Parameters.AddWithValue("@n",   contact.name);
+                    ins.Parameters.AddWithValue("@num", contact.number);
+                    ins.Parameters.AddWithValue("@s",   contact.sos);
+                    ins.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
+                    await ins.ExecuteNonQueryAsync();
+                }
+
+                tx.Commit();
             }
-            uRdr.Close();
-
-            using var del = new SqlCommand("DELETE FROM device_phonebook WHERE device_id=@dev", conn);
-            del.Parameters.AddWithValue("@dev", r.device_id);
-            del.ExecuteNonQuery();
-
-            foreach (var contact in r.phone_book.DistinctBy(c => c.number))
+            catch
             {
-                using var ins = new SqlCommand(@"
-                    IF NOT EXISTS (SELECT 1 FROM device_phonebook WHERE device_id=@dev AND number=@num)
-                    INSERT INTO device_phonebook (device_id,name,number,sos,user_id,company_id)
-                    VALUES (@dev,@n,@num,@s,@uid,@cid)", conn);
-                ins.Parameters.AddWithValue("@dev", r.device_id);
-                ins.Parameters.AddWithValue("@n",   contact.name);
-                ins.Parameters.AddWithValue("@num", contact.number);
-                ins.Parameters.AddWithValue("@s",   contact.sos);
-                ins.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
-                ins.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
-                ins.ExecuteNonQuery();
+                tx.Rollback();
+                throw;
             }
         }
         catch (Exception ex) { _logger.LogError(ex, "SavePhonebook failed for {Device}", r.device_id); }
     }
 
-    public void ClearPhonebook(string deviceId)
-    {
-        Exec("DELETE FROM device_phonebook WHERE device_id=@dev",
+    public Task ClearPhonebook(string deviceId) =>
+        ExecAsync("DELETE FROM device_phonebook WHERE device_id=@dev",
             c => c.Parameters.AddWithValue("@dev", deviceId), "ClearPhonebook");
-    }
 
-    public void SaveClockAlarms(SetAlarmRequest r)
+    public async Task SaveClockAlarms(SetAlarmRequest r)
     {
         try
         {
-            using var conn = Open();
-            using var uCmd = new SqlCommand(
-                "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn);
-            uCmd.Parameters.AddWithValue("@dev", r.device_id);
-            using var uRdr = uCmd.ExecuteReader();
-            int? userId = null; int? companyId = null;
-            if (uRdr.Read())
+            await using var conn = await OpenAsync();
+            using var tx = conn.BeginTransaction();
+            try
             {
-                userId    = uRdr.IsDBNull(0) ? null : uRdr.GetInt32(0);
-                companyId = uRdr.IsDBNull(1) ? null : uRdr.GetInt32(1);
+                await using var uCmd = new SqlCommand(
+                    "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn, tx);
+                uCmd.Parameters.AddWithValue("@dev", r.device_id);
+                await using var uRdr = await uCmd.ExecuteReaderAsync();
+                int? userId = null; int? companyId = null;
+                if (await uRdr.ReadAsync())
+                {
+                    userId    = uRdr.IsDBNull(0) ? null : uRdr.GetInt32(0);
+                    companyId = uRdr.IsDBNull(1) ? null : uRdr.GetInt32(1);
+                }
+                await uRdr.CloseAsync();
+
+                await using var del = new SqlCommand("DELETE FROM device_clock_alarms WHERE device_id=@dev", conn, tx);
+                del.Parameters.AddWithValue("@dev", r.device_id);
+                await del.ExecuteNonQueryAsync();
+
+                foreach (var alarm in r.alarms.DistinctBy(a => (a.hour, a.minute)))
+                {
+                    await using var ins = new SqlCommand(@"
+                        INSERT INTO device_clock_alarms
+                            (device_id,repeat,monday,tuesday,wednesday,thursday,friday,saturday,sunday,hour,minute,title,user_id,company_id)
+                        VALUES (@dev,@rep,@mon,@tue,@wed,@thu,@fri,@sat,@sun,@h,@m,@t,@uid,@cid)", conn, tx);
+                    ins.Parameters.AddWithValue("@dev", r.device_id);
+                    ins.Parameters.AddWithValue("@rep", alarm.repeat);
+                    ins.Parameters.AddWithValue("@mon", alarm.monday);
+                    ins.Parameters.AddWithValue("@tue", alarm.tuesday);
+                    ins.Parameters.AddWithValue("@wed", alarm.wednesday);
+                    ins.Parameters.AddWithValue("@thu", alarm.thursday);
+                    ins.Parameters.AddWithValue("@fri", alarm.friday);
+                    ins.Parameters.AddWithValue("@sat", alarm.saturday);
+                    ins.Parameters.AddWithValue("@sun", alarm.sunday);
+                    ins.Parameters.AddWithValue("@h",   alarm.hour);
+                    ins.Parameters.AddWithValue("@m",   alarm.minute);
+                    ins.Parameters.AddWithValue("@t",   alarm.title);
+                    ins.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
+                    await ins.ExecuteNonQueryAsync();
+                }
+
+                tx.Commit();
             }
-            uRdr.Close();
-
-            using var del = new SqlCommand("DELETE FROM device_clock_alarms WHERE device_id=@dev", conn);
-            del.Parameters.AddWithValue("@dev", r.device_id);
-            del.ExecuteNonQuery();
-
-            foreach (var alarm in r.alarms.DistinctBy(a => (a.hour, a.minute)))
+            catch
             {
-                using var ins = new SqlCommand(@"
-                    IF NOT EXISTS (SELECT 1 FROM device_clock_alarms WHERE device_id=@dev AND hour=@h AND minute=@m)
-                    INSERT INTO device_clock_alarms
-                        (device_id,repeat,monday,tuesday,wednesday,thursday,friday,saturday,sunday,hour,minute,title,user_id,company_id)
-                    VALUES (@dev,@rep,@mon,@tue,@wed,@thu,@fri,@sat,@sun,@h,@m,@t,@uid,@cid)", conn);
-                ins.Parameters.AddWithValue("@dev", r.device_id);
-                ins.Parameters.AddWithValue("@rep", alarm.repeat);
-                ins.Parameters.AddWithValue("@mon", alarm.monday);
-                ins.Parameters.AddWithValue("@tue", alarm.tuesday);
-                ins.Parameters.AddWithValue("@wed", alarm.wednesday);
-                ins.Parameters.AddWithValue("@thu", alarm.thursday);
-                ins.Parameters.AddWithValue("@fri", alarm.friday);
-                ins.Parameters.AddWithValue("@sat", alarm.saturday);
-                ins.Parameters.AddWithValue("@sun", alarm.sunday);
-                ins.Parameters.AddWithValue("@h",   alarm.hour);
-                ins.Parameters.AddWithValue("@m",   alarm.minute);
-                ins.Parameters.AddWithValue("@t",   alarm.title);
-                ins.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
-                ins.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
-                ins.ExecuteNonQuery();
+                tx.Rollback();
+                throw;
             }
         }
         catch (Exception ex) { _logger.LogError(ex, "SaveClockAlarms failed for {Device}", r.device_id); }
     }
 
-    public void ClearClockAlarms(string deviceId)
-    {
-        Exec("DELETE FROM device_clock_alarms WHERE device_id=@dev",
+    public Task ClearClockAlarms(string deviceId) =>
+        ExecAsync("DELETE FROM device_clock_alarms WHERE device_id=@dev",
             c => c.Parameters.AddWithValue("@dev", deviceId), "ClearClockAlarms");
-    }
 
-    public void SaveSedentary(SetSedentaryRequest r)
+    public async Task SaveSedentary(SetSedentaryRequest r)
     {
         try
         {
-            using var conn = Open();
-            using var uCmd = new SqlCommand(
-                "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn);
-            uCmd.Parameters.AddWithValue("@dev", r.device_id);
-            using var uRdr = uCmd.ExecuteReader();
-            int? userId = null; int? companyId = null;
-            if (uRdr.Read())
+            await using var conn = await OpenAsync();
+            using var tx = conn.BeginTransaction();
+            try
             {
-                userId    = uRdr.IsDBNull(0) ? null : uRdr.GetInt32(0);
-                companyId = uRdr.IsDBNull(1) ? null : uRdr.GetInt32(1);
+                await using var uCmd = new SqlCommand(
+                    "SELECT user_id, company_id FROM user_profiles WHERE device_id=@dev AND is_active=1", conn, tx);
+                uCmd.Parameters.AddWithValue("@dev", r.device_id);
+                await using var uRdr = await uCmd.ExecuteReaderAsync();
+                int? userId = null; int? companyId = null;
+                if (await uRdr.ReadAsync())
+                {
+                    userId    = uRdr.IsDBNull(0) ? null : uRdr.GetInt32(0);
+                    companyId = uRdr.IsDBNull(1) ? null : uRdr.GetInt32(1);
+                }
+                await uRdr.CloseAsync();
+
+                await using var del = new SqlCommand("DELETE FROM device_sedentary WHERE device_id=@dev", conn, tx);
+                del.Parameters.AddWithValue("@dev", r.device_id);
+                await del.ExecuteNonQueryAsync();
+
+                foreach (var s in r.sedentaries.DistinctBy(x => (x.start_hour, x.end_hour)))
+                {
+                    await using var ins = new SqlCommand(@"
+                        INSERT INTO device_sedentary
+                            (device_id,repeat,monday,tuesday,wednesday,thursday,friday,saturday,sunday,
+                             start_hour,end_hour,duration,threshold,user_id,company_id)
+                        VALUES (@dev,@rep,@mon,@tue,@wed,@thu,@fri,@sat,@sun,@sh,@eh,@dur,@thr,@uid,@cid)", conn, tx);
+                    ins.Parameters.AddWithValue("@dev", r.device_id);
+                    ins.Parameters.AddWithValue("@rep", s.repeat);
+                    ins.Parameters.AddWithValue("@mon", s.monday);
+                    ins.Parameters.AddWithValue("@tue", s.tuesday);
+                    ins.Parameters.AddWithValue("@wed", s.wednesday);
+                    ins.Parameters.AddWithValue("@thu", s.thursday);
+                    ins.Parameters.AddWithValue("@fri", s.friday);
+                    ins.Parameters.AddWithValue("@sat", s.saturday);
+                    ins.Parameters.AddWithValue("@sun", s.sunday);
+                    ins.Parameters.AddWithValue("@sh",  s.start_hour);
+                    ins.Parameters.AddWithValue("@eh",  s.end_hour);
+                    ins.Parameters.AddWithValue("@dur", s.duration);
+                    ins.Parameters.AddWithValue("@thr", s.threshold);
+                    ins.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
+                    await ins.ExecuteNonQueryAsync();
+                }
+
+                tx.Commit();
             }
-            uRdr.Close();
-
-            using var del = new SqlCommand("DELETE FROM device_sedentary WHERE device_id=@dev", conn);
-            del.Parameters.AddWithValue("@dev", r.device_id);
-            del.ExecuteNonQuery();
-
-            foreach (var s in r.sedentaries.DistinctBy(x => (x.start_hour, x.end_hour)))
+            catch
             {
-                using var ins = new SqlCommand(@"
-                    IF NOT EXISTS (SELECT 1 FROM device_sedentary WHERE device_id=@dev AND start_hour=@sh AND end_hour=@eh)
-                    INSERT INTO device_sedentary
-                        (device_id,repeat,monday,tuesday,wednesday,thursday,friday,saturday,sunday,
-                         start_hour,end_hour,duration,threshold,user_id,company_id)
-                    VALUES (@dev,@rep,@mon,@tue,@wed,@thu,@fri,@sat,@sun,@sh,@eh,@dur,@thr,@uid,@cid)", conn);
-                ins.Parameters.AddWithValue("@dev", r.device_id);
-                ins.Parameters.AddWithValue("@rep", s.repeat);
-                ins.Parameters.AddWithValue("@mon", s.monday);
-                ins.Parameters.AddWithValue("@tue", s.tuesday);
-                ins.Parameters.AddWithValue("@wed", s.wednesday);
-                ins.Parameters.AddWithValue("@thu", s.thursday);
-                ins.Parameters.AddWithValue("@fri", s.friday);
-                ins.Parameters.AddWithValue("@sat", s.saturday);
-                ins.Parameters.AddWithValue("@sun", s.sunday);
-                ins.Parameters.AddWithValue("@sh",  s.start_hour);
-                ins.Parameters.AddWithValue("@eh",  s.end_hour);
-                ins.Parameters.AddWithValue("@dur", s.duration);
-                ins.Parameters.AddWithValue("@thr", s.threshold);
-                ins.Parameters.AddWithValue("@uid", (object?)userId    ?? DBNull.Value);
-                ins.Parameters.AddWithValue("@cid", (object?)companyId ?? DBNull.Value);
-                ins.ExecuteNonQuery();
+                tx.Rollback();
+                throw;
             }
         }
         catch (Exception ex) { _logger.LogError(ex, "SaveSedentary failed for {Device}", r.device_id); }
     }
 
-    public void ClearSedentary(string deviceId)
-    {
-        Exec("DELETE FROM device_sedentary WHERE device_id=@dev",
+    public Task ClearSedentary(string deviceId) =>
+        ExecAsync("DELETE FROM device_sedentary WHERE device_id=@dev",
             c => c.Parameters.AddWithValue("@dev", deviceId), "ClearSedentary");
-    }
 }
