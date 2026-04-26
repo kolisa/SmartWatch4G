@@ -136,6 +136,38 @@ public sealed class GpsQueryService : IGpsQueryService
         }
     }
 
+    public async Task<ServiceResult<DeviceGpsStatusResponse>> GetDeviceGpsStatusAsync(string deviceId)
+    {
+        try
+        {
+            var trackTask   = _db.GetLatestGnssTrack(deviceId);
+            var profileTask = _db.GetUserProfile(deviceId);
+            await Task.WhenAll(trackTask, profileTask);
+
+            var track   = trackTask.Result;
+            var profile = profileTask.Result;
+            var isOnline = _statusCache.IsOnline(deviceId);
+
+            return ServiceResult<DeviceGpsStatusResponse>.Ok(new DeviceGpsStatusResponse
+            {
+                DeviceId   = deviceId,
+                UserName   = profile is null ? null : $"{profile.Name} {profile.Surname}",
+                Status     = isOnline ? "online" : "offline",
+                StatusCode = isOnline ? 1 : 0,
+                GnssTime   = track?.GnssTime,
+                Latitude   = track?.Latitude,
+                Longitude  = track?.Longitude,
+                LocType    = track?.LocType,
+                RecordedAt = track?.CreatedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetDeviceGpsStatusAsync failed for {Device}", deviceId);
+            return ServiceResult<DeviceGpsStatusResponse>.Fail(UnexpectedError, 500);
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static (int skip, int take) Paging(GpsQueryParams q)

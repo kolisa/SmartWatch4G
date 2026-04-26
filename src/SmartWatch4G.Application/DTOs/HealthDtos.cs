@@ -12,8 +12,8 @@ public sealed class HealthQueryParams
     [Range(1, 200, ErrorMessage = "PageSize must be between 1 and 200.")]
     public int PageSize { get; init; } = 20;
 
-    public DateTime? From { get; init; } = DateTime.Today;
-    public DateTime? To   { get; init; } = DateTime.Today.AddDays(1).AddTicks(-1);
+    public DateTime? From { get; init; }
+    public DateTime? To   { get; init; }
 
     /// <summary>Sort by "time" (default) or "device".</summary>
     public string SortBy { get; init; } = "time";

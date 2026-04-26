@@ -45,3 +45,16 @@ public sealed class GpsPagedResult
     public int OnlineCount  { get; init; }
     public int OfflineCount { get; init; }
 }
+
+public sealed class DeviceGpsStatusResponse
+{
+    public string    DeviceId   { get; init; } = string.Empty;
+    public string?   UserName   { get; init; }
+    public string    Status     { get; init; } = string.Empty;
+    public int       StatusCode { get; init; }
+    public string?   GnssTime   { get; init; }
+    public double?   Latitude   { get; init; }
+    public double?   Longitude  { get; init; }
+    public string?   LocType    { get; init; }
+    public DateTime? RecordedAt { get; init; }
+}

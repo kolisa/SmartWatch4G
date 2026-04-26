@@ -56,7 +56,27 @@ public class GpsController : ControllerBase
 
     // ── Device-level ─────────────────────────────────────────────────────────
 
-    /// <summary>GPS track history for a single device.</summary>
+    /// <summary>
+    /// Online/offline status and latest GPS position for a single device.
+    /// StatusCode 1 = online, 0 = offline.
+    /// </summary>
+    [HttpGet("devices/{deviceId}/gps/online")]
+    public async Task<IActionResult> GetDeviceGpsStatus(string deviceId)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+            return BadRequest("Device ID is required.");
+
+        var result = await _gpsService.GetDeviceGpsStatusAsync(deviceId);
+        if (result.IsFailure)
+            return StatusCode(500, result.Error);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// GPS track history for a single device, paginated with optional date filter.
+    /// Defaults to the current day when no date range is supplied.
+    /// </summary>
     [HttpGet("devices/{deviceId}/gps")]
     public async Task<IActionResult> GetByDevice(string deviceId, [FromQuery] GpsQueryParams q)
     {

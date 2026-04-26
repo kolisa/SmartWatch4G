@@ -27,9 +27,13 @@ public sealed class HealthQueryService : IHealthQueryService
             if (!ValidateDateRange(q.From, q.To, out var err))
                 return ServiceResult<HealthPagedResult>.Fail(err!, 400);
 
+            // Company view defaults to today when no date is supplied
+            var from = q.From ?? System.DateTime.Today;
+            var to   = q.To   ?? System.DateTime.Today.AddDays(1).AddTicks(-1);
+
             var (skip, take) = Paging(q);
             var (items, total) = await _db.GetHealthSnapshotsByCompany(
-                companyId, q.From, q.To, skip, take, q.SortDir);
+                companyId, from, to, skip, take, q.SortDir);
 
             var result = new HealthPagedResult
             {

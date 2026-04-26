@@ -16,4 +16,7 @@ public interface IGpsQueryService
 
     /// <summary>GPS track history for a single device.</summary>
     Task<ServiceResult<GpsPagedResult>> GetByDeviceAsync(string deviceId, GpsQueryParams q);
+
+    /// <summary>Online/offline status and latest GPS position for a single device.</summary>
+    Task<ServiceResult<DeviceGpsStatusResponse>> GetDeviceGpsStatusAsync(string deviceId);
 }
