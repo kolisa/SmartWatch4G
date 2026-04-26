@@ -311,7 +311,150 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_audit_occurred'
 GO
 
 -- =============================================================================
--- 6. Verification: show every table + column count + new columns present
+-- 6. DATA CLEANUP: reassign corrupted device_id records to 863758060995486
+--    A firmware encoding bug caused one device to send garbled bytes as its
+--    ID. The fix is in place; this script migrates the orphaned rows.
+--    Safe to re-run: exits early if no corrupted ID is found.
+-- =============================================================================
+DECLARE @bad  NVARCHAR(50);
+DECLARE @good NVARCHAR(50) = N'863758060995486';
+
+-- Find any device_id that isn't a standard 15-digit IMEI
+SELECT TOP 1 @bad = device_id
+FROM (
+    SELECT DISTINCT device_id FROM gps_tracks
+    UNION SELECT DISTINCT device_id FROM health_snapshots
+    UNION SELECT DISTINCT device_id FROM alarms
+    UNION SELECT DISTINCT device_id FROM sos_events
+    UNION SELECT DISTINCT device_id FROM device_info_log
+) AS ids
+WHERE PATINDEX(N'%[^0-9]%', device_id) > 0
+   OR LEN(device_id) <> 15;
+
+IF @bad IS NULL
+BEGIN
+    PRINT N'No corrupted device_id found — cleanup not needed or already done.';
+END
+ELSE
+BEGIN
+    PRINT N'Reassigning corrupted device_id to ' + @good;
+
+    -- gps_tracks (UNIQUE: device_id, gnss_time, longitude, latitude)
+    DELETE g FROM gps_tracks g
+    WHERE g.device_id = @bad
+      AND EXISTS (SELECT 1 FROM gps_tracks x
+                  WHERE x.device_id = @good
+                    AND x.gnss_time  = g.gnss_time
+                    AND x.longitude  = g.longitude
+                    AND x.latitude   = g.latitude);
+    UPDATE gps_tracks SET device_id = @good WHERE device_id = @bad;
+
+    -- health_snapshots (UNIQUE: device_id, record_time)
+    DELETE h FROM health_snapshots h
+    WHERE h.device_id = @bad
+      AND EXISTS (SELECT 1 FROM health_snapshots x
+                  WHERE x.device_id = @good AND x.record_time = h.record_time);
+    UPDATE health_snapshots SET device_id = @good WHERE device_id = @bad;
+
+    -- alarms (UNIQUE: device_id, alarm_time, alarm_type)
+    DELETE a FROM alarms a
+    WHERE a.device_id = @bad
+      AND EXISTS (SELECT 1 FROM alarms x
+                  WHERE x.device_id = @good
+                    AND x.alarm_time = a.alarm_time
+                    AND x.alarm_type = a.alarm_type);
+    UPDATE alarms SET device_id = @good WHERE device_id = @bad;
+
+    -- sos_events (UNIQUE: device_id, alarm_time)
+    DELETE s FROM sos_events s
+    WHERE s.device_id = @bad
+      AND EXISTS (SELECT 1 FROM sos_events x
+                  WHERE x.device_id = @good AND x.alarm_time = s.alarm_time);
+    UPDATE sos_events SET device_id = @good WHERE device_id = @bad;
+
+    -- device_info_log (no unique constraint — just update)
+    UPDATE device_info_log SET device_id = @good WHERE device_id = @bad;
+
+    -- Single-row-per-device tables: keep @good row if it exists, else reassign @bad
+    IF EXISTS (SELECT 1 FROM device_data_freq    WHERE device_id = @good)
+        DELETE FROM device_data_freq    WHERE device_id = @bad;
+    ELSE UPDATE device_data_freq    SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_locate_freq  WHERE device_id = @good)
+        DELETE FROM device_locate_freq  WHERE device_id = @bad;
+    ELSE UPDATE device_locate_freq  SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_gps_settings WHERE device_id = @good)
+        DELETE FROM device_gps_settings WHERE device_id = @bad;
+    ELSE UPDATE device_gps_settings SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_hr_alarm     WHERE device_id = @good)
+        DELETE FROM device_hr_alarm     WHERE device_id = @bad;
+    ELSE UPDATE device_hr_alarm     SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_dynamic_hr_alarm WHERE device_id = @good)
+        DELETE FROM device_dynamic_hr_alarm WHERE device_id = @bad;
+    ELSE UPDATE device_dynamic_hr_alarm SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_spo2_alarm   WHERE device_id = @good)
+        DELETE FROM device_spo2_alarm   WHERE device_id = @bad;
+    ELSE UPDATE device_spo2_alarm   SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_bp_alarm     WHERE device_id = @good)
+        DELETE FROM device_bp_alarm     WHERE device_id = @bad;
+    ELSE UPDATE device_bp_alarm     SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_temp_alarm   WHERE device_id = @good)
+        DELETE FROM device_temp_alarm   WHERE device_id = @bad;
+    ELSE UPDATE device_temp_alarm   SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_fall_settings WHERE device_id = @good)
+        DELETE FROM device_fall_settings WHERE device_id = @bad;
+    ELSE UPDATE device_fall_settings SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_hr_interval  WHERE device_id = @good)
+        DELETE FROM device_hr_interval  WHERE device_id = @bad;
+    ELSE UPDATE device_hr_interval  SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_other_interval WHERE device_id = @good)
+        DELETE FROM device_other_interval WHERE device_id = @bad;
+    ELSE UPDATE device_other_interval SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_goal         WHERE device_id = @good)
+        DELETE FROM device_goal         WHERE device_id = @bad;
+    ELSE UPDATE device_goal         SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_display      WHERE device_id = @good)
+        DELETE FROM device_display      WHERE device_id = @bad;
+    ELSE UPDATE device_display      SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_auto_af      WHERE device_id = @good)
+        DELETE FROM device_auto_af      WHERE device_id = @bad;
+    ELSE UPDATE device_auto_af      SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_bp_adjust    WHERE device_id = @good)
+        DELETE FROM device_bp_adjust    WHERE device_id = @bad;
+    ELSE UPDATE device_bp_adjust    SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_user_info    WHERE device_id = @good)
+        DELETE FROM device_user_info    WHERE device_id = @bad;
+    ELSE UPDATE device_user_info    SET device_id = @good WHERE device_id = @bad;
+
+    IF EXISTS (SELECT 1 FROM device_lcd_gesture  WHERE device_id = @good)
+        DELETE FROM device_lcd_gesture  WHERE device_id = @bad;
+    ELSE UPDATE device_lcd_gesture  SET device_id = @good WHERE device_id = @bad;
+
+    -- user_profiles (device_id PRIMARY KEY)
+    IF EXISTS (SELECT 1 FROM user_profiles WHERE device_id = @good)
+        DELETE FROM user_profiles WHERE device_id = @bad;
+    ELSE UPDATE user_profiles SET device_id = @good WHERE device_id = @bad;
+
+    PRINT N'Done. Rows reassigned to ' + @good;
+END
+GO
+
+-- =============================================================================
+-- 7. Verification: show every table + column count + new columns present
 -- =============================================================================
 SELECT
     t.name                                              AS table_name,
