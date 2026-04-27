@@ -696,6 +696,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
 
     public async Task InsertGpsTrack(string deviceId, string gnssTime, double longitude, double latitude, string locType)
     {
+        deviceId = deviceId.Trim();
         try
         {
             await using var conn = await OpenAsync();

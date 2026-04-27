@@ -7,7 +7,8 @@
       "Read(//c/Users/kolisa/Downloads/4gdata-csharp/4gdata-csharp/netsampleapi/netsampleapi/**)",
       "Bash(xargs basename:*)",
       "Bash(dotnet run:*)",
-      "Bash(echo \"PID=$!\")"
+      "Bash(echo \"PID=$!\")",
+      "Bash(dotnet add *)"
     ]
   }
 }

@@ -15,6 +15,8 @@ public sealed class UserProfileSummaryResponse
     public string Name { get; init; } = string.Empty;
     public string Surname { get; init; } = string.Empty;
     public string? EmpNo { get; init; }
+    public string  Status     { get; init; } = "offline";
+    public int     StatusCode { get; init; }
     public double? LatestLatitude { get; init; }
     public double? LatestLongitude { get; init; }
     public string? LatestGnssTime { get; init; }
@@ -53,6 +55,27 @@ public sealed class UserProfileDetailResponse
     public double? Distance { get; init; }
     public double? Calorie { get; init; }
     public DateTime? HealthRecordedAt { get; init; }
+}
+
+public sealed class DeviceStatusItem
+{
+    public string  DeviceId   { get; init; } = string.Empty;
+    public string  Name       { get; init; } = string.Empty;
+    public string  Surname    { get; init; } = string.Empty;
+    public string? EmpNo      { get; init; }
+    public string  Status     { get; init; } = "offline";
+    public int     StatusCode { get; init; }
+}
+
+public sealed class DeviceStatusPagedResult
+{
+    public IReadOnlyList<DeviceStatusItem> Items { get; init; } = [];
+    public int TotalCount  { get; init; }
+    public int Page        { get; init; }
+    public int PageSize    { get; init; }
+    public int TotalPages  => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
+    public int OnlineCount  { get; init; }
+    public int OfflineCount { get; init; }
 }
 
 /// <summary>

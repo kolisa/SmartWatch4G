@@ -55,7 +55,7 @@ public class AlarmController : ControllerBase
         var optBytes    = new byte[2];
 
         Array.Copy(payload, 0, deviceBytes, 0, 15);
-        string device = Encoding.UTF8.GetString(deviceBytes);
+        string device = Encoding.UTF8.GetString(deviceBytes).Trim('\0', ' ', '\r', '\n');
         _logger.LogInformation("Device: {Device}", device);
 
         try
@@ -102,7 +102,7 @@ public class AlarmController : ControllerBase
             ushort opt = BitConverter.ToUInt16(optBytes, 0);
 
             if (opt == 0x12)
-                _alarmParser.ProceedAlarmV2(pbPayload);
+                await _alarmParser.ProceedAlarmV2(pbPayload, device);
 
             startPos += 8 + length;
             if (payload.Length == startPos) break;

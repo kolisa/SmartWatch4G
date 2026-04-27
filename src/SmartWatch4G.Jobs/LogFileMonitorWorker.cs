@@ -26,9 +26,8 @@ public sealed class LogFileMonitorWorker : IDisposable
     private volatile bool _disposed;
 
     private Dictionary<string, long> _offsets = new();
-    private string _currentFile  = string.Empty;
+    private string _currentFile   = string.Empty;
     private long   _currentOffset;
-    private string _currentDeviceId = string.Empty;
 
     private FileSystemWatcher? _watcher;
 
@@ -178,21 +177,15 @@ public sealed class LogFileMonitorWorker : IDisposable
         @"^\d+/\d+/\d+ \d+:\d+:\d+ [AP]M: \w+ - (.+)$",
         RegexOptions.Compiled);
 
-    static readonly Regex RxDevice   = new(@"^Device: (\S+)$", RegexOptions.Compiled);
-    static readonly Regex RxGps      = new(@"^----gnss time:([^,]+),lon:([^,]+),lat:([^,]+),loc type:(.+)$", RegexOptions.Compiled);
-    static readonly Regex RxBattery  = new(@"^----(\S+ \S+) battery:(\d+), rssi:(-?\d+)$", RegexOptions.Compiled);
-    static readonly Regex RxStep     = new(@"^----(\S+ \S+) step:(\d+), distance:([^,]+), calorie:(.+)$", RegexOptions.Compiled);
-    static readonly Regex RxHr       = new(@"^----(\S+ \S+) avg hr:(\d+), max hr:(\d+), min hr:(\d+)$", RegexOptions.Compiled);
-    static readonly Regex RxSpo2     = new(@"^----(\S+ \S+) avg boxy:(\d+), max boxy:\d+, min boxy:\d+$", RegexOptions.Compiled);
-    static readonly Regex RxBp       = new(@"^----(\S+ \S+) sbp:(\d+), dbp:(\d+)$", RegexOptions.Compiled);
-    static readonly Regex RxFatigue  = new(@"^----(\S+ \S+) fatigue:(\d+)$", RegexOptions.Compiled);
-    static readonly Regex RxLowPower = new(@"^----(\S+ \S+) low power alarm, battery:(\d+)$", RegexOptions.Compiled);
-    static readonly Regex RxNotWear  = new(@"^----(\S+ \S+) not wear alarm$", RegexOptions.Compiled);
-    static readonly Regex RxSosAlarm = new(@"^---- sos alarm time (\S+ \S+)$", RegexOptions.Compiled);
-    static readonly Regex RxCallLog  = new(@"^UploadCallLog: (\{.+\})$", RegexOptions.Compiled);
-    static readonly Regex RxDevInfo  = new(@"^UploadDeviceInfo: (\{.+\})$", RegexOptions.Compiled);
+    static readonly Regex RxCallLog = new(@"^UploadCallLog: (\{.+\})$",  RegexOptions.Compiled);
+    static readonly Regex RxDevInfo = new(@"^UploadDeviceInfo: (\{.+\})$", RegexOptions.Compiled);
 
     // ── Line parser ───────────────────────────────────────────────────────────
+    // GPS, health, and alarm data are written directly to the DB by OldManProcessor
+    // and AlarmProcessor at request time. Parsing those same lines here would
+    // re-attribute them to the wrong device when concurrent requests interleave
+    // their log output. Only UploadCallLog and UploadDeviceInfo are handled here
+    // because they embed the device ID inside their JSON payloads.
 
     private async Task ParseLineAsync(string line)
     {
@@ -201,90 +194,8 @@ public sealed class LogFileMonitorWorker : IDisposable
         var msg = msgMatch.Groups[1].Value;
 
         Match m;
-
-        if ((m = RxDevice.Match(msg)).Success)
-        {
-            _currentDeviceId = m.Groups[1].Value;
-            return;
-        }
-
-        if ((m = RxCallLog.Match(msg)).Success) { await ParseCallLogAsync(m.Groups[1].Value);  return; }
+        if ((m = RxCallLog.Match(msg)).Success) { await ParseCallLogAsync(m.Groups[1].Value);   return; }
         if ((m = RxDevInfo.Match(msg)).Success) { await ParseDeviceInfoAsync(m.Groups[1].Value); return; }
-
-        if (string.IsNullOrEmpty(_currentDeviceId)) return;
-
-        if ((m = RxGps.Match(msg)).Success)
-        {
-            if (double.TryParse(m.Groups[2].Value, out var lon) &&
-                double.TryParse(m.Groups[3].Value, out var lat))
-                await _db.InsertGpsTrack(_currentDeviceId,
-                    m.Groups[1].Value.Trim(), lon, lat, m.Groups[4].Value.Trim());
-            return;
-        }
-
-        if ((m = RxBattery.Match(msg)).Success)
-        {
-            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
-                battery: int.Parse(m.Groups[2].Value),
-                rssi:    int.Parse(m.Groups[3].Value));
-            return;
-        }
-
-        if ((m = RxStep.Match(msg)).Success)
-        {
-            if (double.TryParse(m.Groups[3].Value, out var dist) &&
-                double.TryParse(m.Groups[4].Value, out var cal))
-                await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
-                    steps: int.Parse(m.Groups[2].Value), distance: dist, calorie: cal);
-            return;
-        }
-
-        if ((m = RxHr.Match(msg)).Success)
-        {
-            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
-                avgHr: int.Parse(m.Groups[2].Value),
-                maxHr: int.Parse(m.Groups[3].Value),
-                minHr: int.Parse(m.Groups[4].Value));
-            return;
-        }
-
-        if ((m = RxSpo2.Match(msg)).Success)
-        {
-            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
-                avgSpo2: int.Parse(m.Groups[2].Value));
-            return;
-        }
-
-        if ((m = RxBp.Match(msg)).Success)
-        {
-            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
-                sbp: int.Parse(m.Groups[2].Value),
-                dbp: int.Parse(m.Groups[3].Value));
-            return;
-        }
-
-        if ((m = RxFatigue.Match(msg)).Success)
-        {
-            await _db.UpsertHealthSnapshot(_currentDeviceId, m.Groups[1].Value,
-                fatigue: int.Parse(m.Groups[2].Value));
-            return;
-        }
-
-        if ((m = RxLowPower.Match(msg)).Success)
-        {
-            await _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value,
-                "low_power", $"battery:{m.Groups[2].Value}");
-            return;
-        }
-
-        if ((m = RxNotWear.Match(msg)).Success)
-        {
-            await _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value, "not_wear");
-            return;
-        }
-
-        if ((m = RxSosAlarm.Match(msg)).Success)
-            await _db.InsertAlarm(_currentDeviceId, m.Groups[1].Value, "sos");
     }
 
     // ── JSON parsers ──────────────────────────────────────────────────────────
@@ -295,7 +206,7 @@ public sealed class LogFileMonitorWorker : IDisposable
         {
             using var doc  = JsonDocument.Parse(json);
             var root       = doc.RootElement;
-            var deviceId   = root.GetProperty("deviceid").GetString() ?? _currentDeviceId;
+            var deviceId   = root.GetProperty("deviceid").GetString() ?? string.Empty;
 
             if (!root.TryGetProperty("sos", out var sosList)) return;
 
@@ -333,7 +244,7 @@ public sealed class LogFileMonitorWorker : IDisposable
             using var doc = JsonDocument.Parse(json);
             var root      = doc.RootElement;
             await _db.InsertDeviceInfo(
-                root.GetProperty("deviceid").GetString() ?? _currentDeviceId,
+                root.GetProperty("deviceid").GetString() ?? string.Empty,
                 System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 root.TryGetProperty("model",          out var mo) ? mo.GetString() : null,
                 root.TryGetProperty("version",        out var ve) ? ve.GetString() : null,

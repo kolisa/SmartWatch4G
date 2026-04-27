@@ -9,4 +9,5 @@ public interface IUserProfileQueryService
     Task<ServiceResult<UserProfileDetailResponse>> GetUserProfileDetailAsync(string deviceId);
     Task<ServiceResult<DeviceTelemetryResponse>> GetDeviceTelemetryAsync(string deviceId);
     Task<ServiceResult<IReadOnlyList<DeviceTelemetryResponse>>> GetAllDeviceTelemetryAsync(int? companyId = null);
+    Task<ServiceResult<DeviceStatusPagedResult>> GetDeviceStatusPagedAsync(int page, int pageSize, int? companyId = null);
 }

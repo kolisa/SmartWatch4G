@@ -13,12 +13,15 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
 
     private readonly IDatabaseService _db;
     private readonly IDeviceStatusCache _statusCache;
+    private readonly IwownService _iwown;
     private readonly ILogger<UserProfileQueryService> _logger;
 
-    public UserProfileQueryService(IDatabaseService db, IDeviceStatusCache statusCache, ILogger<UserProfileQueryService> logger)
+    public UserProfileQueryService(IDatabaseService db, IDeviceStatusCache statusCache,
+        IwownService iwown, ILogger<UserProfileQueryService> logger)
     {
         _db          = db;
         _statusCache = statusCache;
+        _iwown       = iwown;
         _logger      = logger;
     }
 
@@ -45,14 +48,23 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
                 workers = await _db.GetPagedUserProfiles(skip, pageSize);
             }
 
-            var tasks = workers.Select(async w =>
+            // Fetch health, GPS, and Iwown status in parallel across all devices on the page
+            var statusTasks = workers.Select(w => _iwown.GetDeviceStatusAsync(w.DeviceId)).ToArray();
+            var dataTask = Task.WhenAll(workers.Select(async w =>
             {
                 var health = await _db.GetLatestHealthSnapshot(w.DeviceId);
                 var track  = await _db.GetLatestGnssTrack(w.DeviceId);
-                return MapSummary(w, health, track);
-            });
+                return (health, track);
+            }));
+            await Task.WhenAll(Task.WhenAll(statusTasks), dataTask);
 
-            var items = await Task.WhenAll(tasks);
+            var data  = dataTask.Result;
+            var items = workers.Select((w, i) =>
+            {
+                var isOnline = DeviceStatusParser.IsOnline(statusTasks[i].Result);
+                _statusCache.SetStatus(w.DeviceId, isOnline);
+                return MapSummary(w, data[i].health, data[i].track, isOnline);
+            }).ToArray();
 
             return ServiceResult<PagedResult<UserProfileSummaryResponse>>.Ok(new PagedResult<UserProfileSummaryResponse>
             {
@@ -120,13 +132,77 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
         }
     }
 
+    public async Task<ServiceResult<DeviceStatusPagedResult>> GetDeviceStatusPagedAsync(int page, int pageSize, int? companyId = null)
+    {
+        if (page < 1)       page     = 1;
+        if (pageSize < 1)   pageSize = 10;
+        if (pageSize > 100) pageSize = 100;
+
+        try
+        {
+            var skip = (page - 1) * pageSize;
+            int total;
+            IReadOnlyList<UserProfile> workers;
+
+            if (companyId.HasValue)
+            {
+                total   = await _db.GetActiveWorkerCountByCompany(companyId.Value);
+                workers = await _db.GetPagedUserProfilesByCompany(skip, pageSize, companyId.Value);
+            }
+            else
+            {
+                total   = await _db.GetActiveWorkerCount();
+                workers = await _db.GetPagedUserProfiles(skip, pageSize);
+            }
+
+            // Call Iwown for every device on this page in parallel
+            var statusTasks = workers.Select(w => _iwown.GetDeviceStatusAsync(w.DeviceId)).ToArray();
+            await Task.WhenAll(statusTasks);
+
+            var items = workers.Select((w, i) =>
+            {
+                var isOnline = DeviceStatusParser.IsOnline(statusTasks[i].Result);
+                _statusCache.SetStatus(w.DeviceId, isOnline);
+                return new DeviceStatusItem
+                {
+                    DeviceId   = w.DeviceId,
+                    Name       = w.Name,
+                    Surname    = w.Surname,
+                    EmpNo      = w.EmpNo,
+                    Status     = isOnline ? "online" : "offline",
+                    StatusCode = isOnline ? 1 : 0
+                };
+            }).ToList();
+
+            var onlineCount  = items.Count(x => x.StatusCode == 1);
+            var offlineCount = items.Count(x => x.StatusCode == 0);
+
+            return ServiceResult<DeviceStatusPagedResult>.Ok(new DeviceStatusPagedResult
+            {
+                Items        = items,
+                TotalCount   = total,
+                Page         = page,
+                PageSize     = pageSize,
+                OnlineCount  = onlineCount,
+                OfflineCount = offlineCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetDeviceStatusPagedAsync failed");
+            return ServiceResult<DeviceStatusPagedResult>.Fail(UnexpectedError, 500);
+        }
+    }
+
     private static UserProfileSummaryResponse MapSummary(
-        UserProfile user, HealthSnapshot? health, GnssTrack? track) => new()
+        UserProfile user, HealthSnapshot? health, GnssTrack? track, bool isOnline) => new()
     {
         DeviceId          = user.DeviceId,
         Name              = user.Name,
         Surname           = user.Surname,
         EmpNo             = user.EmpNo,
+        Status            = isOnline ? "online" : "offline",
+        StatusCode        = isOnline ? 1 : 0,
         LatestLatitude    = track?.Latitude,
         LatestLongitude   = track?.Longitude,
         LatestGnssTime    = track?.GnssTime,

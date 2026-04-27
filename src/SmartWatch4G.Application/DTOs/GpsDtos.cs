@@ -58,3 +58,51 @@ public sealed class DeviceGpsStatusResponse
     public string?   LocType    { get; init; }
     public DateTime? RecordedAt { get; init; }
 }
+
+// ── Map view DTOs ─────────────────────────────────────────────────────────────
+
+/// <summary>Single GPS point for a map track line.</summary>
+public sealed class MapTrackPoint
+{
+    public string   GnssTime   { get; init; } = string.Empty;
+    public double   Latitude   { get; init; }
+    public double   Longitude  { get; init; }
+    public string?  LocType    { get; init; }
+    public DateTime RecordedAt { get; init; }
+}
+
+/// <summary>Latest health snapshot attached to a device's map entry.</summary>
+public sealed class MapHealthSnapshot
+{
+    public string    RecordTime { get; init; } = string.Empty;
+    public int?      Battery    { get; init; }
+    public int?      HeartRate  { get; init; }
+    public int?      MaxHr      { get; init; }
+    public int?      MinHr      { get; init; }
+    public int?      SpO2       { get; init; }
+    public int?      Sbp        { get; init; }
+    public int?      Dbp        { get; init; }
+    public int?      Fatigue    { get; init; }
+    public int?      Steps      { get; init; }
+    public double?   Distance   { get; init; }
+    public double?   Calorie    { get; init; }
+    public DateTime  RecordedAt { get; init; }
+}
+
+/// <summary>
+/// All GPS tracks for one device on a given day, plus the latest health snapshot.
+/// Designed to feed a map view: plot <see cref="Tracks"/> as a polyline,
+/// the first element (most recent) as the current-position marker, and
+/// <see cref="LatestHealth"/> in the marker popup.
+/// </summary>
+public sealed class DeviceMapResponse
+{
+    public string   DeviceId     { get; init; } = string.Empty;
+    public string?  UserName     { get; init; }
+    public string?  EmpNo        { get; init; }
+    public string   Status       { get; init; } = "offline";
+    public int      StatusCode   { get; init; }
+    public DateTime Date         { get; init; }
+    public IReadOnlyList<MapTrackPoint> Tracks { get; init; } = [];
+    public MapHealthSnapshot?           LatestHealth { get; init; }
+}

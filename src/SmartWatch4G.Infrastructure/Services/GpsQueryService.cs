@@ -32,6 +32,9 @@ public sealed class GpsQueryService : IGpsQueryService
             ValidateDateRange(q.From, q.To, out var err);
             if (err is not null) return ServiceResult<GpsPagedResult>.Fail(err, 400);
 
+            // Refresh status from Iwown in real-time so online/offline counts are accurate
+            await RefreshCompanyStatusAsync(companyId);
+
             var (skip, take) = Paging(q);
             var (items, totalCount) = await _db.GetGnssTracksByCompany(
                 companyId, q.From, q.To, skip, take, q.SortDir,
@@ -55,6 +58,9 @@ public sealed class GpsQueryService : IGpsQueryService
         {
             ValidateDateRange(q.From, q.To, out var err);
             if (err is not null) return ServiceResult<GpsPagedResult>.Fail(err, 400);
+
+            // Call Iwown for every device in the company in real-time, then use the fresh cache
+            await RefreshCompanyStatusAsync(companyId);
 
             var (skip, take) = Paging(q);
             var (items, _) = await _db.GetGnssTracksByCompany(
@@ -83,6 +89,9 @@ public sealed class GpsQueryService : IGpsQueryService
             ValidateDateRange(q.From, q.To, out var err);
             if (err is not null) return ServiceResult<GpsPagedResult>.Fail(err, 400);
 
+            // Call Iwown for every device in the company in real-time, then use the fresh cache
+            await RefreshCompanyStatusAsync(companyId);
+
             var (skip, take) = Paging(q);
             var (items, _) = await _db.GetGnssTracksByCompany(
                 companyId, q.From, q.To, skip, take, q.SortDir,
@@ -101,6 +110,18 @@ public sealed class GpsQueryService : IGpsQueryService
             _logger.LogError(ex, "GpsQueryService.GetOfflineByCompanyAsync failed for company {Id}", companyId);
             return ServiceResult<GpsPagedResult>.Fail(UnexpectedError, 500);
         }
+    }
+
+    private async Task RefreshCompanyStatusAsync(int companyId)
+    {
+        var profiles = await _db.GetUsersByCompanyId(companyId);
+        if (profiles.Count == 0) return;
+
+        await Task.WhenAll(profiles.Select(async p =>
+        {
+            var response = await _iwown.GetDeviceStatusAsync(p.DeviceId);
+            _statusCache.SetStatus(p.DeviceId, DeviceStatusParser.IsOnline(response));
+        }));
     }
 
     public async Task<ServiceResult<GpsPagedResult>> GetByDeviceAsync(string deviceId, GpsQueryParams q)
@@ -173,6 +194,151 @@ public sealed class GpsQueryService : IGpsQueryService
         {
             _logger.LogError(ex, "GetDeviceGpsStatusAsync failed for {Device}", deviceId);
             return ServiceResult<DeviceGpsStatusResponse>.Fail(UnexpectedError, 500);
+        }
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<DeviceMapResponse>>> GetMapDataAsync(int companyId, System.DateTime? date)
+    {
+        try
+        {
+            var day  = (date ?? System.DateTime.Today).Date;
+            var from = day;
+            var to   = day.AddDays(1).AddTicks(-1);
+
+            var profiles = await _db.GetUsersByCompanyId(companyId);
+            if (profiles.Count == 0)
+                return ServiceResult<IReadOnlyList<DeviceMapResponse>>.Ok([]);
+
+            // Fetch tracks, health, and online status for all devices in parallel
+            var deviceData = await Task.WhenAll(profiles.Select(async p =>
+            {
+                var tracksTask = _db.GetGnssTracks(p.DeviceId, from, to);
+                var healthTask = _db.GetLatestHealthSnapshot(p.DeviceId);
+                var statusTask = _iwown.GetDeviceStatusAsync(p.DeviceId);
+                await Task.WhenAll(tracksTask, healthTask, statusTask);
+
+                var isOnline = DeviceStatusParser.IsOnline(statusTask.Result);
+                _statusCache.SetStatus(p.DeviceId, isOnline);
+
+                var tracks = tracksTask.Result
+                    .OrderByDescending(t => t.CreatedAt)
+                    .Select(t => new MapTrackPoint
+                    {
+                        GnssTime   = t.GnssTime,
+                        Latitude   = t.Latitude,
+                        Longitude  = t.Longitude,
+                        LocType    = t.LocType,
+                        RecordedAt = t.CreatedAt
+                    })
+                    .ToList();
+
+                var h = healthTask.Result;
+                var health = h is null ? null : new MapHealthSnapshot
+                {
+                    RecordTime = h.RecordTime,
+                    Battery    = h.Battery,
+                    HeartRate  = h.AvgHr,
+                    MaxHr      = h.MaxHr,
+                    MinHr      = h.MinHr,
+                    SpO2       = h.AvgSpo2,
+                    Sbp        = h.Sbp,
+                    Dbp        = h.Dbp,
+                    Fatigue    = h.Fatigue,
+                    Steps      = h.Steps,
+                    Distance   = h.Distance,
+                    Calorie    = h.Calorie,
+                    RecordedAt = h.CreatedAt
+                };
+
+                return new DeviceMapResponse
+                {
+                    DeviceId     = p.DeviceId,
+                    UserName     = $"{p.Name} {p.Surname}".Trim(),
+                    EmpNo        = p.EmpNo,
+                    Status       = isOnline ? "online" : "offline",
+                    StatusCode   = isOnline ? 1 : 0,
+                    Date         = day,
+                    Tracks       = tracks,
+                    LatestHealth = health
+                };
+            }));
+
+            return ServiceResult<IReadOnlyList<DeviceMapResponse>>.Ok(deviceData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GpsQueryService.GetMapDataAsync failed for company {Id}", companyId);
+            return ServiceResult<IReadOnlyList<DeviceMapResponse>>.Fail(UnexpectedError, 500);
+        }
+    }
+
+    public async Task<ServiceResult<DeviceMapResponse>> GetDeviceMapDataAsync(string deviceId, System.DateTime? date)
+    {
+        try
+        {
+            var day  = (date ?? System.DateTime.Today).Date;
+            var from = day;
+            var to   = day.AddDays(1).AddTicks(-1);
+
+            var tracksTask = _db.GetGnssTracks(deviceId, from, to);
+            var healthTask = _db.GetLatestHealthSnapshot(deviceId);
+            var profileTask = _db.GetUserProfile(deviceId);
+            var statusTask = _iwown.GetDeviceStatusAsync(deviceId);
+            await Task.WhenAll(tracksTask, healthTask, profileTask, statusTask);
+
+            var profile = profileTask.Result;
+            if (profile is null)
+                return ServiceResult<DeviceMapResponse>.Fail("Device not found.", 404);
+
+            var isOnline = DeviceStatusParser.IsOnline(statusTask.Result);
+            _statusCache.SetStatus(deviceId, isOnline);
+
+            var tracks = tracksTask.Result
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new MapTrackPoint
+                {
+                    GnssTime   = t.GnssTime,
+                    Latitude   = t.Latitude,
+                    Longitude  = t.Longitude,
+                    LocType    = t.LocType,
+                    RecordedAt = t.CreatedAt
+                })
+                .ToList();
+
+            var h = healthTask.Result;
+            var health = h is null ? null : new MapHealthSnapshot
+            {
+                RecordTime = h.RecordTime,
+                Battery    = h.Battery,
+                HeartRate  = h.AvgHr,
+                MaxHr      = h.MaxHr,
+                MinHr      = h.MinHr,
+                SpO2       = h.AvgSpo2,
+                Sbp        = h.Sbp,
+                Dbp        = h.Dbp,
+                Fatigue    = h.Fatigue,
+                Steps      = h.Steps,
+                Distance   = h.Distance,
+                Calorie    = h.Calorie,
+                RecordedAt = h.CreatedAt
+            };
+
+            return ServiceResult<DeviceMapResponse>.Ok(new DeviceMapResponse
+            {
+                DeviceId     = deviceId,
+                UserName     = $"{profile.Name} {profile.Surname}".Trim(),
+                EmpNo        = profile.EmpNo,
+                Status       = isOnline ? "online" : "offline",
+                StatusCode   = isOnline ? 1 : 0,
+                Date         = day,
+                Tracks       = tracks,
+                LatestHealth = health
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GpsQueryService.GetDeviceMapDataAsync failed for {Device}", deviceId);
+            return ServiceResult<DeviceMapResponse>.Fail(UnexpectedError, 500);
         }
     }
 

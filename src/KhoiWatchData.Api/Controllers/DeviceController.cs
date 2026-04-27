@@ -20,6 +20,26 @@ public sealed class DeviceController : ControllerBase
     }
 
     /// <summary>
+    /// Returns a paginated list of devices with real-time online/offline status
+    /// fetched directly from the Iwown API. Optionally filter by company.
+    /// </summary>
+    /// <param name="page">Page number, 1-based (default: 1).</param>
+    /// <param name="pageSize">Items per page, max 100 (default: 10).</param>
+    /// <param name="companyId">Optional company filter.</param>
+    [HttpGet("status")]
+    public async Task<IActionResult> GetDeviceStatuses(
+        [FromQuery] int  page      = 1,
+        [FromQuery] int  pageSize  = 10,
+        [FromQuery] int? companyId = null)
+    {
+        var result = await _deviceService.GetDeviceStatusPagedAsync(page, pageSize, companyId);
+        if (result.IsFailure)
+            return StatusCode(500, new { message = result.Error });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Returns a paginated list of registered devices with their latest health snapshot
     /// and GPS coordinates. Optionally filter by company.
     /// </summary>

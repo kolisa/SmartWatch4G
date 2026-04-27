@@ -67,7 +67,7 @@ public class DataController : ControllerBase
         var optBytes    = new byte[2];
 
         Array.Copy(payload, 0, deviceBytes, 0, 15);
-        string device = Encoding.UTF8.GetString(deviceBytes);
+        string device = Encoding.UTF8.GetString(deviceBytes).Trim('\0', ' ', '\r', '\n');
         _logger.LogInformation("Device: {Device}", device);
 
         try
