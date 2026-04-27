@@ -5,7 +5,8 @@ using SmartWatch4G.Application.Interfaces;
 namespace KhoiWatchData.Api.Controllers;
 
 [ApiController]
-[Route("users")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/users")]
 public sealed class UserController : ControllerBase
 {
     private const string DeviceIdRequired = "Device ID is required.";

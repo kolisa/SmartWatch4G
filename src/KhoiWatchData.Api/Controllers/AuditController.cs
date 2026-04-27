@@ -5,7 +5,8 @@ using SmartWatch4G.Domain.Interfaces;
 namespace KhoiWatchData.Api.Controllers;
 
 [ApiController]
-[Route("audit")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/audit")]
 public class AuditController : ControllerBase
 {
     private readonly IDatabaseService _db;

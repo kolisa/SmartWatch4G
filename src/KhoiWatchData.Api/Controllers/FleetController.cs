@@ -9,7 +9,8 @@ namespace KhoiWatchData.Api.Controllers;
 /// system-agnostic endpoint usable by any integration.
 /// </summary>
 [ApiController]
-[Route("fleet")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/fleet")]
 public sealed class FleetController : ControllerBase
 {
     private readonly IDashboardService _dashboard;

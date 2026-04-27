@@ -7,7 +7,8 @@ namespace KhoiWatchData.Api.Controllers;
 /// Device command configuration queries — company-level and device-level.
 /// </summary>
 [ApiController]
-[Route("")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}")]
 public class DeviceConfigController : ControllerBase
 {
     private readonly IDeviceConfigQueryService _configService;

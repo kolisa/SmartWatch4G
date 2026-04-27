@@ -4,7 +4,8 @@ using SmartWatch4G.Application.Interfaces;
 namespace KhoiWatchData.Api.Controllers;
 
 [ApiController]
-[Route("alerts")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/alerts")]
 public sealed class AlertController : ControllerBase
 {
     private readonly IAlertQueryService _alertService;

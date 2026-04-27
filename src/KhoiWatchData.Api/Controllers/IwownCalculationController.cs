@@ -7,7 +7,8 @@ using SmartWatch4G.Infrastructure.Services;
 namespace KhoiWatchData.Api.Controllers;
 
 [ApiController]
-[Route("calculation")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/calculation")]
 public class IwownCalculationController : ControllerBase
 {
     private readonly IwownCalculationService _calc;

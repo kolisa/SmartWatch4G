@@ -8,7 +8,8 @@ namespace KhoiWatchData.Api.Controllers;
 /// Health data queries — company-level (paged + summary) and device-level with pagination and date filtering.
 /// </summary>
 [ApiController]
-[Route("")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}")]
 public class HealthController : ControllerBase
 {
     private readonly IHealthQueryService _healthService;

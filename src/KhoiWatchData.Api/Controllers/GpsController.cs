@@ -9,7 +9,8 @@ namespace KhoiWatchData.Api.Controllers;
 /// date filtering, and online/offline separation.
 /// </summary>
 [ApiController]
-[Route("")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}")]
 public class GpsController : ControllerBase
 {
     private readonly IGpsQueryService _gpsService;

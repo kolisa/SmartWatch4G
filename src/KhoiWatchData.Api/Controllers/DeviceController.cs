@@ -8,7 +8,8 @@ namespace KhoiWatchData.Api.Controllers;
 /// Route names are system-agnostic so this controller can be used in any integration.
 /// </summary>
 [ApiController]
-[Route("devices")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/devices")]
 public sealed class DeviceController : ControllerBase
 {
     private readonly IUserProfileQueryService _deviceService;

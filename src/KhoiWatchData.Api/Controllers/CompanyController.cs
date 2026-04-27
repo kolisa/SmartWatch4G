@@ -5,7 +5,8 @@ using SmartWatch4G.Application.Interfaces;
 namespace KhoiWatchData.Api.Controllers;
 
 [ApiController]
-[Route("companies")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/companies")]
 public sealed class CompanyController : ControllerBase
 {
     private readonly ICompanyService _companyService;

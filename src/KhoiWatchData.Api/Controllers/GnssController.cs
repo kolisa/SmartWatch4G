@@ -4,7 +4,8 @@ using SmartWatch4G.Application.Interfaces;
 namespace KhoiWatchData.Api.Controllers;
 
 [ApiController]
-[Route("gnss")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/gnss")]
 public sealed class GnssController : ControllerBase
 {
     private readonly IGnssQueryService _gnssService;
