@@ -46,6 +46,13 @@ public class AlarmProcessor
                 await _db.InsertAlarm(deviceId, t, "spo2_alarm", $"spo2:{spo2Alarm.Spo2}");
             }
 
+            foreach (var thrombusAlarm in pbAlarm1.AlarmThrombus)
+            {
+                var t = DateTimeUtilities.FromUnixSeconds(thrombusAlarm.TimeStamp.DateTime_.Seconds);
+                _logger.LogInformation("----{Time} cardiovascular alarm, triggered:{Triggered}", t, thrombusAlarm.ThrombusAlarm);
+                await _db.InsertAlarm(deviceId, t, "cardiovascular", $"triggered:{thrombusAlarm.ThrombusAlarm}");
+            }
+
             foreach (var fallAlarm in pbAlarm1.AlarmFall)
             {
                 var t = DateTimeUtilities.FromUnixSeconds(fallAlarm.TimeStamp.DateTime_.Seconds);
@@ -86,6 +93,13 @@ public class AlarmProcessor
                 var t = DateTimeUtilities.FromUnixSeconds(sugarAlarm.TimeStamp.DateTime_.Seconds);
                 _logger.LogInformation("----{Time} blood sugar alarm, blood sugar:{Sugar}", t, sugarAlarm.BloodSugar);
                 await _db.InsertAlarm(deviceId, t, "blood_sugar", $"sugar:{sugarAlarm.BloodSugar}");
+            }
+
+            foreach (var sedAlarm in pbAlarm1.AlarmSedentary)
+            {
+                var t = DateTimeUtilities.FromUnixSeconds(sedAlarm.TimeStamp.DateTime_.Seconds);
+                _logger.LogInformation("----{Time} sedentary alarm", t);
+                await _db.InsertAlarm(deviceId, t, "sedentary");
             }
         }
 

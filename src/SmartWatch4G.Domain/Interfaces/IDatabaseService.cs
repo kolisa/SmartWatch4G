@@ -10,7 +10,12 @@ public interface IDatabaseService
         int? battery = null, int? rssi = null,
         int? steps = null, double? distance = null, double? calorie = null,
         int? avgHr = null, int? maxHr = null, int? minHr = null,
-        int? avgSpo2 = null, int? sbp = null, int? dbp = null, int? fatigue = null);
+        int? avgSpo2 = null, int? sbp = null, int? dbp = null, int? fatigue = null,
+        double? bodyTempEvi = null, int? bodyTempEsti = null, int? tempType = null,
+        int? bpBpm = null, double? bloodPotassium = null, double? bloodSugar = null,
+        double? biozR = null, double? biozX = null, double? biozFat = null,
+        double? biozBmi = null, int? biozType = null,
+        double? breathRate = null, int? moodLevel = null);
 
     Task InsertAlarm(string deviceId, string alarmTime, string alarmType, string? details = null);
 
@@ -23,7 +28,19 @@ public interface IDatabaseService
 
     Task InsertSleepCalculation(string deviceId, string recordDate,
         int completed, string? startTime, string? endTime, int hr, int turnTimes,
-        double? respAvg, double? respMax, double? respMin, string? sectionsJson);
+        double? respAvg, double? respMax, double? respMin, string? sectionsJson,
+        int? deepSleep = null, int? lightSleep = null, int? weakSleep = null, int? eyemoveSleep = null);
+
+    Task InsertEcgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson);
+    Task InsertPpgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson);
+    Task InsertAccWaveform(string deviceId, string recordedAt, int sampleCount, string? accXBase64, string? accYBase64, string? accZBase64);
+    Task InsertRriWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson);
+    Task InsertSpo2Waveform(string deviceId, string recordedAt, string readingsJson);
+    Task InsertMultiLeadsEcgWaveform(string deviceId, string recordedAt, int channels, int byteLen, string rawBase64);
+    Task InsertThirdPartyReading(string deviceId, string macAddr, string? devName, string readingType,
+        string? recordedAt, double? sbp, double? dbp, double? hr, double? pulse,
+        double? weight, double? impedance, double? bodyFatPct,
+        double? spo2, double? pi, double? bodyTemp, double? value);
 
     Task InsertEcgCalculation(string deviceId, int result, int hr, int effective, int direction);
 

@@ -64,7 +64,11 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
                 var isOnline = DeviceStatusParser.IsOnline(statusTasks[i].Result);
                 _statusCache.SetStatus(w.DeviceId, isOnline);
                 return MapSummary(w, data[i].health, data[i].track, isOnline);
-            }).ToArray();
+            })
+            .OrderBy(x => x.StatusCode == 1 ? 0 : 1)
+            .ThenBy(x => x.Name)
+            .ThenBy(x => x.Surname)
+            .ToArray();
 
             return ServiceResult<PagedResult<UserProfileSummaryResponse>>.Ok(new PagedResult<UserProfileSummaryResponse>
             {
@@ -134,9 +138,9 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
 
     public async Task<ServiceResult<DeviceStatusPagedResult>> GetDeviceStatusPagedAsync(int page, int pageSize, int? companyId = null)
     {
-        if (page < 1)       page     = 1;
-        if (pageSize < 1)   pageSize = 10;
-        if (pageSize > 100) pageSize = 100;
+        if (page < 1)        page     = 1;
+        if (pageSize < 1)    pageSize = 1000;
+        if (pageSize > 1000) pageSize = 1000;
 
         try
         {
@@ -155,22 +159,27 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
                 workers = await _db.GetPagedUserProfiles(skip, pageSize);
             }
 
-            // Call Iwown for every device on this page in parallel
+            // Fetch Iwown status and latest GPS in parallel for every device on this page
             var statusTasks = workers.Select(w => _iwown.GetDeviceStatusAsync(w.DeviceId)).ToArray();
-            await Task.WhenAll(statusTasks);
+            var gpsTasks    = workers.Select(w => _db.GetLatestGnssTrack(w.DeviceId)).ToArray();
+            await Task.WhenAll(Task.WhenAll(statusTasks), Task.WhenAll(gpsTasks));
 
             var items = workers.Select((w, i) =>
             {
                 var isOnline = DeviceStatusParser.IsOnline(statusTasks[i].Result);
+                var track    = gpsTasks[i].Result;
                 _statusCache.SetStatus(w.DeviceId, isOnline);
                 return new DeviceStatusItem
                 {
-                    DeviceId   = w.DeviceId,
-                    Name       = w.Name,
-                    Surname    = w.Surname,
-                    EmpNo      = w.EmpNo,
-                    Status     = isOnline ? "online" : "offline",
-                    StatusCode = isOnline ? 1 : 0
+                    DeviceId        = w.DeviceId,
+                    Name            = w.Name,
+                    Surname         = w.Surname,
+                    EmpNo           = w.EmpNo,
+                    Status          = isOnline ? "online" : "offline",
+                    StatusCode      = isOnline ? 1 : 0,
+                    LatestLatitude  = track?.Latitude,
+                    LatestLongitude = track?.Longitude,
+                    LatestGnssTime  = track?.GnssTime
                 };
             }).ToList();
 

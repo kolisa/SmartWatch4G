@@ -59,12 +59,15 @@ public sealed class UserProfileDetailResponse
 
 public sealed class DeviceStatusItem
 {
-    public string  DeviceId   { get; init; } = string.Empty;
-    public string  Name       { get; init; } = string.Empty;
-    public string  Surname    { get; init; } = string.Empty;
-    public string? EmpNo      { get; init; }
-    public string  Status     { get; init; } = "offline";
-    public int     StatusCode { get; init; }
+    public string  DeviceId        { get; init; } = string.Empty;
+    public string  Name            { get; init; } = string.Empty;
+    public string  Surname         { get; init; } = string.Empty;
+    public string? EmpNo           { get; init; }
+    public string  Status          { get; init; } = "offline";
+    public int     StatusCode      { get; init; }
+    public double? LatestLatitude  { get; init; }
+    public double? LatestLongitude { get; init; }
+    public string? LatestGnssTime  { get; init; }
 }
 
 public sealed class DeviceStatusPagedResult

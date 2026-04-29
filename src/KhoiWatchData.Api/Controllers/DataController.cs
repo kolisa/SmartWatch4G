@@ -119,7 +119,7 @@ public class DataController : ControllerBase
                     await _oldmanParser.ProceedOldMan(pbPayload, device);
                     break;
                 case 0x80:
-                    _historyDataParser.ProceedHistoryData(pbPayload);
+                    await _historyDataParser.ProceedHistoryData(pbPayload, device);
                     _sleepPreprocessor.PrepareSleepData(pbPayload);
                     _ecgPreprocessor.PrepareEcgData(pbPayload);
                     _afPreprocessor.PrepareRriData(pbPayload);

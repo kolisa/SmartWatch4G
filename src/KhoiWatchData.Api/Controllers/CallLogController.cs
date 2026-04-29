@@ -10,46 +10,40 @@ namespace KhoiWatchData.Api.Controllers;
 [ApiController]
 public class CallLogController : ControllerBase
 {
-    private readonly ILogger<CallLogController> _logger;
-    private readonly RawDataFileStore _rawDataStore;
+    private readonly ILogger<CallLogController> logger;
 
-    public CallLogController(ILogger<CallLogController> logger, RawDataFileStore rawDataStore)
+    public CallLogController(ILogger<CallLogController> thelogger)
     {
-        _logger       = logger;
-        _rawDataStore = rawDataStore;
+        logger = thelogger;
     }
 
     [HttpPost]
     public async Task<IActionResult> UploadCallLog()
     {
-        string bodyData = string.Empty;
+        ResponseCode response;
+        DeviceCallLogs? requestData = null;
         try
         {
             using var reader = new StreamReader(Request.Body);
-            bodyData = await reader.ReadToEndAsync();
-            _logger.LogInformation("UploadCallLog: {BodyData}", bodyData);
+            var bodyData = await reader.ReadToEndAsync();
+            logger.LogInformation("UploadCallLog: {BodyData}", bodyData);
 
-            var requestData = JsonSerializer.Deserialize<DeviceCallLogs>(bodyData ?? string.Empty);
+            requestData = JsonSerializer.Deserialize<DeviceCallLogs>(bodyData ?? string.Empty);
             if (requestData == null)
-                return Ok(new ResponseCode { ReturnCode = 10002 });
-
-            try
             {
-                await _rawDataStore.SaveAsync(requestData.DeviceId ?? "unknown", "calllog",
-                    Encoding.UTF8.GetBytes(bodyData!));
-                _logger.LogInformation("[call_log/upload] Raw payload saved for device {DeviceId}", requestData.DeviceId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[call_log/upload] Failed to save raw payload for device {DeviceId}", requestData.DeviceId);
+                response = new ResponseCode { ReturnCode = 10002 };
+                return Ok(response);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError("Error reading or deserializing request: {Message}", ex.Message);
-            return Ok(new ResponseCode { ReturnCode = 10002 });
+            logger.LogError("Error reading or deserializing request: {Message}", ex.Message);
+            response = new ResponseCode { ReturnCode = 10002 };
+            return Ok(response);
         }
 
-        return Ok(new ResponseCode { ReturnCode = 0 });
+        response = new ResponseCode { ReturnCode = 0 };
+        return Ok(response);
     }
+
 }

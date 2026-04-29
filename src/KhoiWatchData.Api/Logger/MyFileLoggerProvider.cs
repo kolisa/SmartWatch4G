@@ -9,7 +9,7 @@ public class MyFileLoggerProvider : ILoggerProvider
         _filePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
     }
 
-    // Suppress Quartz internals, ASP.NET Core hosting lifetime, and HTTPS redirect noise.
+    // Suppress Quartz internals, ASP.NET Core hosting lifetime, HTTPS redirect noise, and HTTP client pipeline logs.
     private static readonly string[] _suppressedPrefixes =
     [
         "Quartz.",
@@ -18,6 +18,7 @@ public class MyFileLoggerProvider : ILoggerProvider
         "Microsoft.AspNetCore.HttpsPolicy.",
         "Microsoft.AspNetCore.Server.",
         "Microsoft.Extensions.Hosting.",
+        "System.Net.Http.HttpClient.",
     ];
 
     public ILogger CreateLogger(string categoryName)

@@ -9,18 +9,13 @@ namespace KhoiWatchData.Api.Controllers;
 [ApiController]
 public class AlarmController : ControllerBase
 {
-    private readonly ILogger<AlarmController> _logger;
-    private readonly AlarmProcessor _alarmParser;
-    private readonly RawDataFileStore _rawDataStore;
+    private readonly ILogger<AlarmController> logger;
+    private readonly AlarmProcessor alarmParser;
 
-    public AlarmController(
-        ILogger<AlarmController> logger,
-        AlarmProcessor alarmParser,
-        RawDataFileStore rawDataStore)
+    public AlarmController(ILogger<AlarmController> thelogger, AlarmProcessor thealarmParser)
     {
-        _logger       = logger;
-        _alarmParser  = alarmParser;
-        _rawDataStore = rawDataStore;
+        logger = thelogger;
+        alarmParser = thealarmParser;
     }
 
     [HttpPost]
@@ -35,52 +30,42 @@ public class AlarmController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError("Read post data failed: {Message}", ex.Message);
+            logger.LogError("Read post data failed: {Message}", ex.Message);
             return File(new byte[] { 0x01 }, "text/plain");
         }
 
         if (payload.Length < 23)
         {
-            _logger.LogWarning("[alarm/upload] Payload too short: received {Bytes} bytes, minimum is 23", payload.Length);
+            logger.LogWarning("Data length below 23");
             return File(new byte[] { 0x02 }, "text/plain");
         }
 
         string hexString = BitConverter.ToString(payload).Replace("-", "");
-        _logger.LogInformation("receive data: {HexString}", hexString);
+        logger.LogInformation("receive data: {hexString}", hexString);
 
         var deviceBytes = new byte[15];
         var prefixBytes = new byte[2];
-        var lenBytes    = new byte[2];
-        var crcBytes    = new byte[2];
-        var optBytes    = new byte[2];
+        var lenBytes = new byte[2];
+        var crcBytes = new byte[2];
+        var optBytes = new byte[2];
 
         Array.Copy(payload, 0, deviceBytes, 0, 15);
-        string device = Encoding.UTF8.GetString(deviceBytes).Trim('\0', ' ', '\r', '\n');
-        _logger.LogInformation("Device: {Device}", device);
-
-        try
-        {
-            await _rawDataStore.SaveAsync(device, "alarm", payload);
-            _logger.LogInformation("[alarm/upload] Raw payload saved for device {Device} ({Bytes} bytes)", device.Trim(), payload.Length);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[alarm/upload] Failed to save raw payload for device {Device}", device.Trim());
-        }
+        string device = Encoding.UTF8.GetString(deviceBytes);
+        logger.LogInformation("Device: {Device}", device);
 
         int startPos = 15;
         while (true)
         {
             if (payload.Length < startPos + 8)
             {
-                _logger.LogWarning("Data length below {Length}", startPos + 8);
+                logger.LogWarning("Data length below {Length}", startPos + 8);
                 return File(new byte[] { 0x02 }, "text/plain");
             }
 
             Array.Copy(payload, startPos, prefixBytes, 0, 2);
             if (prefixBytes[0] != 0x44 || prefixBytes[1] != 0x54)
             {
-                _logger.LogWarning("Invalid data header at {Position}", startPos);
+                logger.LogWarning("Invalid data header at {Position}", startPos);
                 return File(new byte[] { 0x03 }, "text/plain");
             }
 
@@ -92,7 +77,7 @@ public class AlarmController : ControllerBase
 
             if (payload.Length < startPos + 8 + length)
             {
-                _logger.LogWarning("Data length below {Length}", startPos + 8 + length);
+                logger.LogWarning("Data length below {Length}", startPos + 8 + length);
                 return File(new byte[] { 0x02 }, "text/plain");
             }
 
@@ -101,13 +86,19 @@ public class AlarmController : ControllerBase
 
             ushort opt = BitConverter.ToUInt16(optBytes, 0);
 
-            if (opt == 0x12)
-                await _alarmParser.ProceedAlarmV2(pbPayload, device);
-
+            switch (opt)
+            {
+                case 0x12:
+                    await alarmParser.ProceedAlarmV2(pbPayload, device.Trim());
+                    break;
+            }
             startPos += 8 + length;
-            if (payload.Length == startPos) break;
+            if (payload.Length == startPos)
+            {
+                // Read to the end and no extra byte left
+                break;
+            }
         }
-
         return File(new byte[] { 0x00 }, "text/plain");
     }
 }

@@ -723,7 +723,12 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         int? battery = null, int? rssi = null,
         int? steps = null, double? distance = null, double? calorie = null,
         int? avgHr = null, int? maxHr = null, int? minHr = null,
-        int? avgSpo2 = null, int? sbp = null, int? dbp = null, int? fatigue = null)
+        int? avgSpo2 = null, int? sbp = null, int? dbp = null, int? fatigue = null,
+        double? bodyTempEvi = null, int? bodyTempEsti = null, int? tempType = null,
+        int? bpBpm = null, double? bloodPotassium = null, double? bloodSugar = null,
+        double? biozR = null, double? biozX = null, double? biozFat = null,
+        double? biozBmi = null, int? biozType = null,
+        double? breathRate = null, int? moodLevel = null)
     {
         try
         {
@@ -736,38 +741,77 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                     LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1
                 ) AS s ON t.device_id = s.device_id AND t.record_time = s.record_time
                 WHEN MATCHED THEN UPDATE SET
-                    battery  = COALESCE(@bat,  t.battery),
-                    rssi     = COALESCE(@rssi, t.rssi),
-                    steps    = COALESCE(@stp,  t.steps),
-                    distance = COALESCE(@dist, t.distance),
-                    calorie  = COALESCE(@cal,  t.calorie),
-                    avg_hr   = COALESCE(@ahr,  t.avg_hr),
-                    max_hr   = COALESCE(@xhr,  t.max_hr),
-                    min_hr   = COALESCE(@nhr,  t.min_hr),
-                    avg_spo2 = COALESCE(@spo,  t.avg_spo2),
-                    sbp      = COALESCE(@sbp,  t.sbp),
-                    dbp      = COALESCE(@dbp,  t.dbp),
-                    fatigue  = COALESCE(@fat,  t.fatigue),
-                    user_id    = COALESCE(s.user_id,    t.user_id),
-                    company_id = COALESCE(s.company_id, t.company_id)
+                    battery         = COALESCE(@bat,  t.battery),
+                    rssi            = COALESCE(@rssi, t.rssi),
+                    steps           = COALESCE(@stp,  t.steps),
+                    distance        = COALESCE(@dist, t.distance),
+                    calorie         = COALESCE(@cal,  t.calorie),
+                    avg_hr          = COALESCE(@ahr,  t.avg_hr),
+                    max_hr          = COALESCE(@xhr,  t.max_hr),
+                    min_hr          = COALESCE(@nhr,  t.min_hr),
+                    avg_spo2        = COALESCE(@spo,  t.avg_spo2),
+                    sbp             = COALESCE(@sbp,  t.sbp),
+                    dbp             = COALESCE(@dbp,  t.dbp),
+                    fatigue         = COALESCE(@fat,  t.fatigue),
+                    body_temp_evi   = COALESCE(@bte,  t.body_temp_evi),
+                    body_temp_esti  = COALESCE(@bts,  t.body_temp_esti),
+                    temp_type       = COALESCE(@tty,  t.temp_type),
+                    bp_bpm          = COALESCE(@bbp,  t.bp_bpm),
+                    blood_potassium = COALESCE(@bpk,  t.blood_potassium),
+                    blood_sugar     = COALESCE(@bsg,  t.blood_sugar),
+                    bioz_r          = COALESCE(@bzr,  t.bioz_r),
+                    bioz_x          = COALESCE(@bzx,  t.bioz_x),
+                    bioz_fat        = COALESCE(@bzf,  t.bioz_fat),
+                    bioz_bmi        = COALESCE(@bzm,  t.bioz_bmi),
+                    bioz_type       = COALESCE(@bzt,  t.bioz_type),
+                    breath_rate     = COALESCE(@brr,  t.breath_rate),
+                    mood_level      = COALESCE(@mld,  t.mood_level),
+                    user_id         = COALESCE(s.user_id,    t.user_id),
+                    company_id      = COALESCE(s.company_id, t.company_id)
                 WHEN NOT MATCHED THEN INSERT
-                    (device_id, record_time, battery, rssi, steps, distance, calorie, avg_hr, max_hr, min_hr, avg_spo2, sbp, dbp, fatigue, user_id, company_id)
-                    VALUES (s.device_id, s.record_time, @bat, @rssi, @stp, @dist, @cal, @ahr, @xhr, @nhr, @spo, @sbp, @dbp, @fat, s.user_id, s.company_id);", conn);
+                    (device_id, record_time,
+                     battery, rssi, steps, distance, calorie,
+                     avg_hr, max_hr, min_hr, avg_spo2, sbp, dbp, fatigue,
+                     body_temp_evi, body_temp_esti, temp_type,
+                     bp_bpm, blood_potassium, blood_sugar,
+                     bioz_r, bioz_x, bioz_fat, bioz_bmi, bioz_type,
+                     breath_rate, mood_level,
+                     user_id, company_id)
+                VALUES (s.device_id, s.record_time,
+                    @bat, @rssi, @stp, @dist, @cal,
+                    @ahr, @xhr, @nhr, @spo, @sbp, @dbp, @fat,
+                    @bte, @bts, @tty, @bbp, @bpk, @bsg,
+                    @bzr, @bzx, @bzf, @bzm, @bzt,
+                    @brr, @mld,
+                    s.user_id, s.company_id);", conn);
 
             cmd.Parameters.AddWithValue("@dev",  deviceId);
             cmd.Parameters.AddWithValue("@rt",   recordTime);
-            cmd.Parameters.AddWithValue("@bat",  (object?)battery  ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@rssi", (object?)rssi     ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@stp",  (object?)steps    ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@dist", (object?)distance ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@cal",  (object?)calorie  ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@ahr",  (object?)avgHr    ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@xhr",  (object?)maxHr    ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@nhr",  (object?)minHr    ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@spo",  (object?)avgSpo2  ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@sbp",  (object?)sbp      ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@dbp",  (object?)dbp      ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@fat",  (object?)fatigue  ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bat",  (object?)battery         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rssi", (object?)rssi            ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@stp",  (object?)steps           ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@dist", (object?)distance        ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@cal",  (object?)calorie         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ahr",  (object?)avgHr           ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@xhr",  (object?)maxHr           ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@nhr",  (object?)minHr           ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@spo",  (object?)avgSpo2         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@sbp",  (object?)sbp             ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@dbp",  (object?)dbp             ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@fat",  (object?)fatigue         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bte",  (object?)bodyTempEvi     ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bts",  (object?)bodyTempEsti    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@tty",  (object?)tempType        ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bbp",  (object?)bpBpm           ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bpk",  (object?)bloodPotassium  ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bsg",  (object?)bloodSugar      ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bzr",  (object?)biozR           ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bzx",  (object?)biozX           ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bzf",  (object?)biozFat         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bzm",  (object?)biozBmi         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bzt",  (object?)biozType        ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@brr",  (object?)breathRate      ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@mld",  (object?)moodLevel       ?? DBNull.Value);
             await cmd.ExecuteNonQueryAsync();
             await LogAuditAsync(conn, "UPSERT", "health_snapshots", deviceId, recordTime);
         }
@@ -851,32 +895,199 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
 
     public async Task InsertSleepCalculation(string deviceId, string recordDate,
         int completed, string? startTime, string? endTime, int hr, int turnTimes,
-        double? respAvg, double? respMax, double? respMin, string? sectionsJson)
+        double? respAvg, double? respMax, double? respMin, string? sectionsJson,
+        int? deepSleep = null, int? lightSleep = null, int? weakSleep = null, int? eyemoveSleep = null)
     {
         try
         {
             await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 INSERT INTO sleep_calculations
-                    (device_id,record_date,completed,start_time,end_time,hr,turn_times,resp_avg,resp_max,resp_min,sections,user_id,company_id)
-                SELECT @dev,@rd,@comp,@st,@et,@hr,@tt,@ra,@rx,@rn,@sec, u.user_id, u.company_id
+                    (device_id,record_date,completed,start_time,end_time,hr,turn_times,
+                     resp_avg,resp_max,resp_min,sections,
+                     deep_sleep,light_sleep,weak_sleep,eyemove_sleep,
+                     user_id,company_id)
+                SELECT @dev,@rd,@comp,@st,@et,@hr,@tt,
+                       @ra,@rx,@rn,@sec,
+                       @ds,@ls,@ws,@es,
+                       u.user_id, u.company_id
                 FROM (VALUES(1)) AS x(dummy)
                 LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
             cmd.Parameters.AddWithValue("@dev",  deviceId);
             cmd.Parameters.AddWithValue("@rd",   recordDate);
             cmd.Parameters.AddWithValue("@comp", completed);
-            cmd.Parameters.AddWithValue("@st",   (object?)startTime  ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@et",   (object?)endTime    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@st",   (object?)startTime    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@et",   (object?)endTime      ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@hr",   hr);
             cmd.Parameters.AddWithValue("@tt",   turnTimes);
-            cmd.Parameters.AddWithValue("@ra",   (object?)respAvg    ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@rx",   (object?)respMax    ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@rn",   (object?)respMin    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ra",   (object?)respAvg      ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rx",   (object?)respMax      ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rn",   (object?)respMin      ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@sec",  (object?)sectionsJson ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ds",   (object?)deepSleep    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ls",   (object?)lightSleep   ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ws",   (object?)weakSleep    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@es",   (object?)eyemoveSleep ?? DBNull.Value);
             await cmd.ExecuteNonQueryAsync();
             await LogAuditAsync(conn, "INSERT", "sleep_calculations", deviceId, recordDate);
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertSleepCalculation failed for {Device}", deviceId); }
+    }
+
+    public async Task InsertEcgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO ecg_waveforms (device_id,recorded_at,sample_count,raw_data,user_id,company_id)
+                SELECT @dev,@ra,@sc,@rd, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@ra",  recordedAt);
+            cmd.Parameters.AddWithValue("@sc",  sampleCount);
+            cmd.Parameters.AddWithValue("@rd",  rawDataJson);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "InsertEcgWaveform failed for {Device}", deviceId); }
+    }
+
+    public async Task InsertPpgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO ppg_waveforms (device_id,recorded_at,sample_count,raw_data,user_id,company_id)
+                SELECT @dev,@ra,@sc,@rd, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@ra",  recordedAt);
+            cmd.Parameters.AddWithValue("@sc",  sampleCount);
+            cmd.Parameters.AddWithValue("@rd",  rawDataJson);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "InsertPpgWaveform failed for {Device}", deviceId); }
+    }
+
+    public async Task InsertAccWaveform(string deviceId, string recordedAt, int sampleCount,
+        string? accXBase64, string? accYBase64, string? accZBase64)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO acc_waveforms (device_id,recorded_at,sample_count,acc_x,acc_y,acc_z,user_id,company_id)
+                SELECT @dev,@ra,@sc,@ax,@ay,@az, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@ra",  recordedAt);
+            cmd.Parameters.AddWithValue("@sc",  sampleCount);
+            cmd.Parameters.AddWithValue("@ax",  (object?)accXBase64 ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ay",  (object?)accYBase64 ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@az",  (object?)accZBase64 ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "InsertAccWaveform failed for {Device}", deviceId); }
+    }
+
+    public async Task InsertRriWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO rri_waveforms (device_id,recorded_at,sample_count,raw_data,user_id,company_id)
+                SELECT @dev,@ra,@sc,@rd, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@ra",  recordedAt);
+            cmd.Parameters.AddWithValue("@sc",  sampleCount);
+            cmd.Parameters.AddWithValue("@rd",  rawDataJson);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "InsertRriWaveform failed for {Device}", deviceId); }
+    }
+
+    public async Task InsertSpo2Waveform(string deviceId, string recordedAt, string readingsJson)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO spo2_waveforms (device_id,recorded_at,readings,user_id,company_id)
+                SELECT @dev,@ra,@rd, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@ra",  recordedAt);
+            cmd.Parameters.AddWithValue("@rd",  readingsJson);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "InsertSpo2Waveform failed for {Device}", deviceId); }
+    }
+
+    public async Task InsertMultiLeadsEcgWaveform(string deviceId, string recordedAt, int channels, int byteLen, string rawBase64)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO multi_leads_ecg_waveforms (device_id,recorded_at,channels,byte_len,raw_data,user_id,company_id)
+                SELECT @dev,@ra,@ch,@bl,@rd, u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@ra",  recordedAt);
+            cmd.Parameters.AddWithValue("@ch",  channels);
+            cmd.Parameters.AddWithValue("@bl",  byteLen);
+            cmd.Parameters.AddWithValue("@rd",  rawBase64);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "InsertMultiLeadsEcgWaveform failed for {Device}", deviceId); }
+    }
+
+    public async Task InsertThirdPartyReading(string deviceId, string macAddr, string? devName, string readingType,
+        string? recordedAt, double? sbp, double? dbp, double? hr, double? pulse,
+        double? weight, double? impedance, double? bodyFatPct,
+        double? spo2, double? pi, double? bodyTemp, double? value)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO third_party_readings
+                    (device_id,mac_addr,dev_name,reading_type,recorded_at,
+                     sbp,dbp,hr,pulse,weight,impedance,body_fat_pct,spo2,pi,body_temp,value,
+                     user_id,company_id)
+                SELECT @dev,@mac,@dn,@rt,@ra,
+                       @sbp,@dbp,@hr,@pul,@wgt,@imp,@bfp,@spo,@pi,@btm,@val,
+                       u.user_id, u.company_id
+                FROM (VALUES(1)) AS x(dummy)
+                LEFT JOIN user_profiles u ON u.device_id=@dev AND u.is_active=1", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@mac", macAddr);
+            cmd.Parameters.AddWithValue("@dn",  (object?)devName    ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@rt",  readingType);
+            cmd.Parameters.AddWithValue("@ra",  (object?)recordedAt ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@sbp", (object?)sbp        ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@dbp", (object?)dbp        ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@hr",  (object?)hr         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pul", (object?)pulse      ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@wgt", (object?)weight     ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@imp", (object?)impedance  ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@bfp", (object?)bodyFatPct ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@spo", (object?)spo2       ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pi",  (object?)pi         ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@btm", (object?)bodyTemp   ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@val", (object?)value      ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "InsertThirdPartyReading failed for {Device}", deviceId); }
     }
 
     public async Task InsertEcgCalculation(string deviceId, int result, int hr, int effective, int direction)
@@ -1255,7 +1466,9 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 "device_bp_alarm", "device_temp_alarm", "device_auto_af", "device_goal", "device_display",
                 "device_bp_adjust", "device_hr_interval", "device_other_interval", "device_gps_settings",
                 "device_phonebook", "device_clock_alarms", "device_sedentary",
-                "sleep_calculations", "ecg_calculations", "af_calculations", "spo2_calculations"
+                "sleep_calculations", "ecg_calculations", "af_calculations", "spo2_calculations",
+                "ecg_waveforms", "ppg_waveforms", "acc_waveforms",
+                "rri_waveforms", "spo2_waveforms", "multi_leads_ecg_waveforms", "third_party_readings"
             ];
 
             int total = 0;
@@ -1352,7 +1565,10 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             using var cmd = new SqlCommand(@"
                 SELECT TOP 1 id, device_id, record_time, battery, rssi, steps,
                        distance, calorie, avg_hr, max_hr, min_hr,
-                       avg_spo2, sbp, dbp, fatigue, created_at
+                       avg_spo2, sbp, dbp, fatigue,
+                       body_temp_evi, body_temp_esti, temp_type, bp_bpm, blood_potassium, blood_sugar,
+                       bioz_r, bioz_x, bioz_fat, bioz_bmi, bioz_type, breath_rate, mood_level,
+                       created_at
                 FROM health_snapshots
                 WHERE device_id = @dev
                 ORDER BY id DESC", conn);
@@ -1361,22 +1577,35 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             if (!await r.ReadAsync()) return null;
             return new HealthSnapshot
             {
-                Id         = r.GetInt32(0),
-                DeviceId   = r.GetString(1),
-                RecordTime = r.GetString(2),
-                Battery    = r.IsDBNull(3)  ? null : r.GetInt32(3),
-                Rssi       = r.IsDBNull(4)  ? null : r.GetInt32(4),
-                Steps      = r.IsDBNull(5)  ? null : r.GetInt32(5),
-                Distance   = r.IsDBNull(6)  ? null : r.GetDouble(6),
-                Calorie    = r.IsDBNull(7)  ? null : r.GetDouble(7),
-                AvgHr      = r.IsDBNull(8)  ? null : r.GetInt32(8),
-                MaxHr      = r.IsDBNull(9)  ? null : r.GetInt32(9),
-                MinHr      = r.IsDBNull(10) ? null : r.GetInt32(10),
-                AvgSpo2    = r.IsDBNull(11) ? null : r.GetInt32(11),
-                Sbp        = r.IsDBNull(12) ? null : r.GetInt32(12),
-                Dbp        = r.IsDBNull(13) ? null : r.GetInt32(13),
-                Fatigue    = r.IsDBNull(14) ? null : r.GetInt32(14),
-                CreatedAt  = r.GetDateTime(15)
+                Id              = r.GetInt32(0),
+                DeviceId        = r.GetString(1),
+                RecordTime      = r.GetString(2),
+                Battery         = r.IsDBNull(3)  ? null : r.GetInt32(3),
+                Rssi            = r.IsDBNull(4)  ? null : r.GetInt32(4),
+                Steps           = r.IsDBNull(5)  ? null : r.GetInt32(5),
+                Distance        = r.IsDBNull(6)  ? null : r.GetDouble(6),
+                Calorie         = r.IsDBNull(7)  ? null : r.GetDouble(7),
+                AvgHr           = r.IsDBNull(8)  ? null : r.GetInt32(8),
+                MaxHr           = r.IsDBNull(9)  ? null : r.GetInt32(9),
+                MinHr           = r.IsDBNull(10) ? null : r.GetInt32(10),
+                AvgSpo2         = r.IsDBNull(11) ? null : r.GetInt32(11),
+                Sbp             = r.IsDBNull(12) ? null : r.GetInt32(12),
+                Dbp             = r.IsDBNull(13) ? null : r.GetInt32(13),
+                Fatigue         = r.IsDBNull(14) ? null : r.GetInt32(14),
+                BodyTempEvi     = r.IsDBNull(15) ? null : r.GetDouble(15),
+                BodyTempEsti    = r.IsDBNull(16) ? null : r.GetInt32(16),
+                TempType        = r.IsDBNull(17) ? null : r.GetInt32(17),
+                BpBpm           = r.IsDBNull(18) ? null : r.GetInt32(18),
+                BloodPotassium  = r.IsDBNull(19) ? null : r.GetDouble(19),
+                BloodSugar      = r.IsDBNull(20) ? null : r.GetDouble(20),
+                BiozR           = r.IsDBNull(21) ? null : r.GetDouble(21),
+                BiozX           = r.IsDBNull(22) ? null : r.GetDouble(22),
+                BiozFat         = r.IsDBNull(23) ? null : r.GetDouble(23),
+                BiozBmi         = r.IsDBNull(24) ? null : r.GetDouble(24),
+                BiozType        = r.IsDBNull(25) ? null : r.GetInt32(25),
+                BreathRate      = r.IsDBNull(26) ? null : r.GetDouble(26),
+                MoodLevel       = r.IsDBNull(27) ? null : r.GetInt32(27),
+                CreatedAt       = r.GetDateTime(28)
             };
         }
         catch (Exception ex)
@@ -1702,7 +1931,10 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             using (var cmd = new SqlCommand($@"
                 SELECT id, device_id, record_time, battery, rssi, steps,
                        distance, calorie, avg_hr, max_hr, min_hr,
-                       avg_spo2, sbp, dbp, fatigue, created_at
+                       avg_spo2, sbp, dbp, fatigue,
+                       body_temp_evi, body_temp_esti, temp_type, bp_bpm, blood_potassium, blood_sugar,
+                       bioz_r, bioz_x, bioz_fat, bioz_bmi, bioz_type, breath_rate, mood_level,
+                       created_at
                 FROM health_snapshots
                 WHERE device_id=@dev
                   AND (@from IS NULL OR created_at >= @from)
@@ -1754,7 +1986,11 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 WITH ranked AS (
                     SELECT h.id, h.device_id, h.record_time, h.battery, h.rssi, h.steps,
                            h.distance, h.calorie, h.avg_hr, h.max_hr, h.min_hr,
-                           h.avg_spo2, h.sbp, h.dbp, h.fatigue, h.created_at,
+                           h.avg_spo2, h.sbp, h.dbp, h.fatigue,
+                           h.body_temp_evi, h.body_temp_esti, h.temp_type, h.bp_bpm,
+                           h.blood_potassium, h.blood_sugar,
+                           h.bioz_r, h.bioz_x, h.bioz_fat, h.bioz_bmi, h.bioz_type,
+                           h.breath_rate, h.mood_level, h.created_at,
                            CASE WHEN u.name IS NOT NULL THEN u.name + ' ' + u.surname END AS user_name,
                            ROW_NUMBER() OVER (PARTITION BY h.device_id ORDER BY h.id DESC) AS rn
                     FROM health_snapshots h
@@ -1765,7 +2001,10 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 )
                 SELECT id, device_id, user_name, record_time, battery, rssi, steps,
                        distance, calorie, avg_hr, max_hr, min_hr,
-                       avg_spo2, sbp, dbp, fatigue, created_at
+                       avg_spo2, sbp, dbp, fatigue,
+                       body_temp_evi, body_temp_esti, temp_type, bp_bpm, blood_potassium, blood_sugar,
+                       bioz_r, bioz_x, bioz_fat, bioz_bmi, bioz_type, breath_rate, mood_level,
+                       created_at
                 FROM ranked
                 WHERE rn = 1
                 ORDER BY created_at {dir}
@@ -1776,30 +2015,44 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                 cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
                 cmd.Parameters.AddWithValue("@skip", skip);
                 cmd.Parameters.AddWithValue("@take", take);
-                // columns: 0=id, 1=device_id, 2=user_name, 3=record_time, 4=battery,
-                //          5=rssi, 6=steps, 7=distance, 8=calorie, 9=avg_hr,
-                //          10=max_hr, 11=min_hr, 12=avg_spo2, 13=sbp, 14=dbp, 15=fatigue, 16=created_at
+                // 0=id,1=device_id,2=user_name,3=record_time,4=battery,5=rssi,6=steps,
+                // 7=distance,8=calorie,9=avg_hr,10=max_hr,11=min_hr,12=avg_spo2,13=sbp,14=dbp,15=fatigue,
+                // 16=body_temp_evi,17=body_temp_esti,18=temp_type,19=bp_bpm,20=blood_potassium,21=blood_sugar,
+                // 22=bioz_r,23=bioz_x,24=bioz_fat,25=bioz_bmi,26=bioz_type,27=breath_rate,28=mood_level,29=created_at
                 await using var r = await cmd.ExecuteReaderAsync();
                 while (await r.ReadAsync())
                 {
                     var snap = new HealthSnapshot
                     {
-                        Id         = r.GetInt32(0),
-                        DeviceId   = r.GetString(1),
-                        RecordTime = r.GetString(3),
-                        Battery    = r.IsDBNull(4)  ? null : r.GetInt32(4),
-                        Rssi       = r.IsDBNull(5)  ? null : r.GetInt32(5),
-                        Steps      = r.IsDBNull(6)  ? null : r.GetInt32(6),
-                        Distance   = r.IsDBNull(7)  ? null : r.GetDouble(7),
-                        Calorie    = r.IsDBNull(8)  ? null : r.GetDouble(8),
-                        AvgHr      = r.IsDBNull(9)  ? null : r.GetInt32(9),
-                        MaxHr      = r.IsDBNull(10) ? null : r.GetInt32(10),
-                        MinHr      = r.IsDBNull(11) ? null : r.GetInt32(11),
-                        AvgSpo2    = r.IsDBNull(12) ? null : r.GetInt32(12),
-                        Sbp        = r.IsDBNull(13) ? null : r.GetInt32(13),
-                        Dbp        = r.IsDBNull(14) ? null : r.GetInt32(14),
-                        Fatigue    = r.IsDBNull(15) ? null : r.GetInt32(15),
-                        CreatedAt  = r.GetDateTime(16)
+                        Id              = r.GetInt32(0),
+                        DeviceId        = r.GetString(1),
+                        RecordTime      = r.GetString(3),
+                        Battery         = r.IsDBNull(4)  ? null : r.GetInt32(4),
+                        Rssi            = r.IsDBNull(5)  ? null : r.GetInt32(5),
+                        Steps           = r.IsDBNull(6)  ? null : r.GetInt32(6),
+                        Distance        = r.IsDBNull(7)  ? null : r.GetDouble(7),
+                        Calorie         = r.IsDBNull(8)  ? null : r.GetDouble(8),
+                        AvgHr           = r.IsDBNull(9)  ? null : r.GetInt32(9),
+                        MaxHr           = r.IsDBNull(10) ? null : r.GetInt32(10),
+                        MinHr           = r.IsDBNull(11) ? null : r.GetInt32(11),
+                        AvgSpo2         = r.IsDBNull(12) ? null : r.GetInt32(12),
+                        Sbp             = r.IsDBNull(13) ? null : r.GetInt32(13),
+                        Dbp             = r.IsDBNull(14) ? null : r.GetInt32(14),
+                        Fatigue         = r.IsDBNull(15) ? null : r.GetInt32(15),
+                        BodyTempEvi     = r.IsDBNull(16) ? null : r.GetDouble(16),
+                        BodyTempEsti    = r.IsDBNull(17) ? null : r.GetInt32(17),
+                        TempType        = r.IsDBNull(18) ? null : r.GetInt32(18),
+                        BpBpm           = r.IsDBNull(19) ? null : r.GetInt32(19),
+                        BloodPotassium  = r.IsDBNull(20) ? null : r.GetDouble(20),
+                        BloodSugar      = r.IsDBNull(21) ? null : r.GetDouble(21),
+                        BiozR           = r.IsDBNull(22) ? null : r.GetDouble(22),
+                        BiozX           = r.IsDBNull(23) ? null : r.GetDouble(23),
+                        BiozFat         = r.IsDBNull(24) ? null : r.GetDouble(24),
+                        BiozBmi         = r.IsDBNull(25) ? null : r.GetDouble(25),
+                        BiozType        = r.IsDBNull(26) ? null : r.GetInt32(26),
+                        BreathRate      = r.IsDBNull(27) ? null : r.GetDouble(27),
+                        MoodLevel       = r.IsDBNull(28) ? null : r.GetInt32(28),
+                        CreatedAt       = r.GetDateTime(29)
                     };
                     list.Add((r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), snap));
                 }
@@ -2048,22 +2301,35 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
 
     private static HealthSnapshot MapHealthSnapshot(SqlDataReader r) => new()
     {
-        Id         = r.GetInt32(0),
-        DeviceId   = r.GetString(1),
-        RecordTime = r.GetString(2),
-        Battery    = r.IsDBNull(3)  ? null : r.GetInt32(3),
-        Rssi       = r.IsDBNull(4)  ? null : r.GetInt32(4),
-        Steps      = r.IsDBNull(5)  ? null : r.GetInt32(5),
-        Distance   = r.IsDBNull(6)  ? null : r.GetDouble(6),
-        Calorie    = r.IsDBNull(7)  ? null : r.GetDouble(7),
-        AvgHr      = r.IsDBNull(8)  ? null : r.GetInt32(8),
-        MaxHr      = r.IsDBNull(9)  ? null : r.GetInt32(9),
-        MinHr      = r.IsDBNull(10) ? null : r.GetInt32(10),
-        AvgSpo2    = r.IsDBNull(11) ? null : r.GetInt32(11),
-        Sbp        = r.IsDBNull(12) ? null : r.GetInt32(12),
-        Dbp        = r.IsDBNull(13) ? null : r.GetInt32(13),
-        Fatigue    = r.IsDBNull(14) ? null : r.GetInt32(14),
-        CreatedAt  = r.GetDateTime(15)
+        Id              = r.GetInt32(0),
+        DeviceId        = r.GetString(1),
+        RecordTime      = r.GetString(2),
+        Battery         = r.IsDBNull(3)  ? null : r.GetInt32(3),
+        Rssi            = r.IsDBNull(4)  ? null : r.GetInt32(4),
+        Steps           = r.IsDBNull(5)  ? null : r.GetInt32(5),
+        Distance        = r.IsDBNull(6)  ? null : r.GetDouble(6),
+        Calorie         = r.IsDBNull(7)  ? null : r.GetDouble(7),
+        AvgHr           = r.IsDBNull(8)  ? null : r.GetInt32(8),
+        MaxHr           = r.IsDBNull(9)  ? null : r.GetInt32(9),
+        MinHr           = r.IsDBNull(10) ? null : r.GetInt32(10),
+        AvgSpo2         = r.IsDBNull(11) ? null : r.GetInt32(11),
+        Sbp             = r.IsDBNull(12) ? null : r.GetInt32(12),
+        Dbp             = r.IsDBNull(13) ? null : r.GetInt32(13),
+        Fatigue         = r.IsDBNull(14) ? null : r.GetInt32(14),
+        BodyTempEvi     = r.IsDBNull(15) ? null : r.GetDouble(15),
+        BodyTempEsti    = r.IsDBNull(16) ? null : r.GetInt32(16),
+        TempType        = r.IsDBNull(17) ? null : r.GetInt32(17),
+        BpBpm           = r.IsDBNull(18) ? null : r.GetInt32(18),
+        BloodPotassium  = r.IsDBNull(19) ? null : r.GetDouble(19),
+        BloodSugar      = r.IsDBNull(20) ? null : r.GetDouble(20),
+        BiozR           = r.IsDBNull(21) ? null : r.GetDouble(21),
+        BiozX           = r.IsDBNull(22) ? null : r.GetDouble(22),
+        BiozFat         = r.IsDBNull(23) ? null : r.GetDouble(23),
+        BiozBmi         = r.IsDBNull(24) ? null : r.GetDouble(24),
+        BiozType        = r.IsDBNull(25) ? null : r.GetInt32(25),
+        BreathRate      = r.IsDBNull(26) ? null : r.GetDouble(26),
+        MoodLevel       = r.IsDBNull(27) ? null : r.GetInt32(27),
+        CreatedAt       = r.GetDateTime(28)
     };
 
     // ── Audit helpers ─────────────────────────────────────────────────────────

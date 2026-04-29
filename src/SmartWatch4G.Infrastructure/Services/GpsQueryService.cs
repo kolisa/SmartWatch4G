@@ -280,18 +280,16 @@ public sealed class GpsQueryService : IGpsQueryService
             var from = day;
             var to   = day.AddDays(1).AddTicks(-1);
 
-            var tracksTask = _db.GetGnssTracks(deviceId, from, to);
-            var healthTask = _db.GetLatestHealthSnapshot(deviceId);
+            var tracksTask  = _db.GetGnssTracks(deviceId, from, to);
+            var healthTask  = _db.GetLatestHealthSnapshot(deviceId);
             var profileTask = _db.GetUserProfile(deviceId);
-            var statusTask = _iwown.GetDeviceStatusAsync(deviceId);
-            await Task.WhenAll(tracksTask, healthTask, profileTask, statusTask);
+            await Task.WhenAll(tracksTask, healthTask, profileTask);
 
             var profile = profileTask.Result;
             if (profile is null)
                 return ServiceResult<DeviceMapResponse>.Fail("Device not found.", 404);
 
-            var isOnline = DeviceStatusParser.IsOnline(statusTask.Result);
-            _statusCache.SetStatus(deviceId, isOnline);
+            var isOnline = _statusCache.IsOnline(deviceId);
 
             var tracks = tracksTask.Result
                 .OrderByDescending(t => t.CreatedAt)

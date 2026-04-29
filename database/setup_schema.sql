@@ -73,26 +73,54 @@ GO
 -- ── health_snapshots ──────────────────────────────────────────────────────────
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'health_snapshots')
 CREATE TABLE health_snapshots (
-    id          INT IDENTITY(1,1) PRIMARY KEY,
-    device_id   NVARCHAR(50)  NOT NULL,
-    record_time NVARCHAR(30)  NOT NULL,
-    battery     INT           NULL,
-    rssi        INT           NULL,
-    steps       INT           NULL,
-    distance    FLOAT         NULL,
-    calorie     FLOAT         NULL,
-    avg_hr      INT           NULL,
-    max_hr      INT           NULL,
-    min_hr      INT           NULL,
-    avg_spo2    INT           NULL,
-    sbp         INT           NULL,
-    dbp         INT           NULL,
-    fatigue     INT           NULL,
-    user_id     INT           NULL,
-    company_id  INT           NULL,
-    created_at  DATETIME2     DEFAULT GETDATE(),
+    id               INT IDENTITY(1,1) PRIMARY KEY,
+    device_id        NVARCHAR(50)  NOT NULL,
+    record_time      NVARCHAR(30)  NOT NULL,
+    battery          INT           NULL,
+    rssi             INT           NULL,
+    steps            INT           NULL,
+    distance         FLOAT         NULL,
+    calorie          FLOAT         NULL,
+    avg_hr           INT           NULL,
+    max_hr           INT           NULL,
+    min_hr           INT           NULL,
+    avg_spo2         INT           NULL,
+    sbp              INT           NULL,
+    dbp              INT           NULL,
+    fatigue          INT           NULL,
+    body_temp_evi    FLOAT         NULL,
+    body_temp_esti   INT           NULL,
+    temp_type        INT           NULL,
+    bp_bpm           INT           NULL,
+    blood_potassium  FLOAT         NULL,
+    blood_sugar      FLOAT         NULL,
+    bioz_r           FLOAT         NULL,
+    bioz_x           FLOAT         NULL,
+    bioz_fat         FLOAT         NULL,
+    bioz_bmi         FLOAT         NULL,
+    bioz_type        INT           NULL,
+    breath_rate      FLOAT         NULL,
+    mood_level       INT           NULL,
+    user_id          INT           NULL,
+    company_id       INT           NULL,
+    created_at       DATETIME2     DEFAULT GETDATE(),
     CONSTRAINT uq_health UNIQUE (device_id, record_time)
 );
+GO
+
+IF COL_LENGTH('health_snapshots','body_temp_evi')   IS NULL ALTER TABLE health_snapshots ADD body_temp_evi   FLOAT NULL;
+IF COL_LENGTH('health_snapshots','body_temp_esti')  IS NULL ALTER TABLE health_snapshots ADD body_temp_esti  INT   NULL;
+IF COL_LENGTH('health_snapshots','temp_type')       IS NULL ALTER TABLE health_snapshots ADD temp_type       INT   NULL;
+IF COL_LENGTH('health_snapshots','bp_bpm')          IS NULL ALTER TABLE health_snapshots ADD bp_bpm          INT   NULL;
+IF COL_LENGTH('health_snapshots','blood_potassium') IS NULL ALTER TABLE health_snapshots ADD blood_potassium FLOAT NULL;
+IF COL_LENGTH('health_snapshots','blood_sugar')     IS NULL ALTER TABLE health_snapshots ADD blood_sugar     FLOAT NULL;
+IF COL_LENGTH('health_snapshots','bioz_r')          IS NULL ALTER TABLE health_snapshots ADD bioz_r          FLOAT NULL;
+IF COL_LENGTH('health_snapshots','bioz_x')          IS NULL ALTER TABLE health_snapshots ADD bioz_x          FLOAT NULL;
+IF COL_LENGTH('health_snapshots','bioz_fat')        IS NULL ALTER TABLE health_snapshots ADD bioz_fat        FLOAT NULL;
+IF COL_LENGTH('health_snapshots','bioz_bmi')        IS NULL ALTER TABLE health_snapshots ADD bioz_bmi        FLOAT NULL;
+IF COL_LENGTH('health_snapshots','bioz_type')       IS NULL ALTER TABLE health_snapshots ADD bioz_type       INT   NULL;
+IF COL_LENGTH('health_snapshots','breath_rate')     IS NULL ALTER TABLE health_snapshots ADD breath_rate     FLOAT NULL;
+IF COL_LENGTH('health_snapshots','mood_level')      IS NULL ALTER TABLE health_snapshots ADD mood_level      INT   NULL;
 GO
 
 -- ── alarms ────────────────────────────────────────────────────────────────────
@@ -441,21 +469,75 @@ GO
 -- ── sleep_calculations ────────────────────────────────────────────────────────
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'sleep_calculations')
 CREATE TABLE sleep_calculations (
-    id          INT IDENTITY(1,1) PRIMARY KEY,
-    device_id   NVARCHAR(50)  NOT NULL,
-    record_date NVARCHAR(10)  NOT NULL,
-    completed   INT           NOT NULL,
-    start_time  NVARCHAR(30)  NULL,
-    end_time    NVARCHAR(30)  NULL,
-    hr          INT           NULL,
-    turn_times  INT           NULL,
-    resp_avg    FLOAT         NULL,
-    resp_max    FLOAT         NULL,
-    resp_min    FLOAT         NULL,
-    sections    NVARCHAR(MAX) NULL,
-    user_id     INT           NULL,
-    company_id  INT           NULL,
-    created_at  DATETIME2     DEFAULT GETDATE()
+    id           INT IDENTITY(1,1) PRIMARY KEY,
+    device_id    NVARCHAR(50)  NOT NULL,
+    record_date  NVARCHAR(10)  NOT NULL,
+    completed    INT           NOT NULL,
+    start_time   NVARCHAR(30)  NULL,
+    end_time     NVARCHAR(30)  NULL,
+    hr           INT           NULL,
+    turn_times   INT           NULL,
+    resp_avg     FLOAT         NULL,
+    resp_max     FLOAT         NULL,
+    resp_min     FLOAT         NULL,
+    sections     NVARCHAR(MAX) NULL,
+    deep_sleep   INT           NULL,
+    light_sleep  INT           NULL,
+    weak_sleep   INT           NULL,
+    eyemove_sleep INT          NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
+    created_at   DATETIME2     DEFAULT GETDATE()
+);
+GO
+
+IF COL_LENGTH('sleep_calculations','deep_sleep')    IS NULL ALTER TABLE sleep_calculations ADD deep_sleep    INT NULL;
+IF COL_LENGTH('sleep_calculations','light_sleep')   IS NULL ALTER TABLE sleep_calculations ADD light_sleep   INT NULL;
+IF COL_LENGTH('sleep_calculations','weak_sleep')    IS NULL ALTER TABLE sleep_calculations ADD weak_sleep    INT NULL;
+IF COL_LENGTH('sleep_calculations','eyemove_sleep') IS NULL ALTER TABLE sleep_calculations ADD eyemove_sleep INT NULL;
+GO
+
+-- ── ecg_waveforms ─────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ecg_waveforms')
+CREATE TABLE ecg_waveforms (
+    id           INT IDENTITY(1,1) PRIMARY KEY,
+    device_id    NVARCHAR(50)  NOT NULL,
+    recorded_at  NVARCHAR(30)  NOT NULL,
+    sample_count INT           NOT NULL,
+    raw_data     NVARCHAR(MAX) NOT NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
+    created_at   DATETIME2     DEFAULT GETDATE()
+);
+GO
+
+-- ── ppg_waveforms ─────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ppg_waveforms')
+CREATE TABLE ppg_waveforms (
+    id           INT IDENTITY(1,1) PRIMARY KEY,
+    device_id    NVARCHAR(50)  NOT NULL,
+    recorded_at  NVARCHAR(30)  NOT NULL,
+    sample_count INT           NOT NULL,
+    raw_data     NVARCHAR(MAX) NOT NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
+    created_at   DATETIME2     DEFAULT GETDATE()
+);
+GO
+
+-- ── acc_waveforms ──────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'acc_waveforms')
+CREATE TABLE acc_waveforms (
+    id           INT IDENTITY(1,1) PRIMARY KEY,
+    device_id    NVARCHAR(50)  NOT NULL,
+    recorded_at  NVARCHAR(30)  NOT NULL,
+    sample_count INT           NOT NULL,
+    acc_x        NVARCHAR(MAX) NULL,
+    acc_y        NVARCHAR(MAX) NULL,
+    acc_z        NVARCHAR(MAX) NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
+    created_at   DATETIME2     DEFAULT GETDATE()
 );
 GO
 
@@ -496,6 +578,74 @@ CREATE TABLE spo2_calculations (
     user_id    INT          NULL,
     company_id INT          NULL,
     created_at DATETIME2    DEFAULT GETDATE()
+);
+GO
+
+-- ── rri_waveforms ─────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'rri_waveforms')
+CREATE TABLE rri_waveforms (
+    id           INT IDENTITY(1,1) PRIMARY KEY,
+    device_id    NVARCHAR(50)  NOT NULL,
+    recorded_at  NVARCHAR(30)  NOT NULL,
+    sample_count INT           NOT NULL,
+    raw_data     NVARCHAR(MAX) NOT NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
+    created_at   DATETIME2     DEFAULT GETDATE()
+);
+GO
+
+-- ── spo2_waveforms ────────────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'spo2_waveforms')
+CREATE TABLE spo2_waveforms (
+    id           INT IDENTITY(1,1) PRIMARY KEY,
+    device_id    NVARCHAR(50)  NOT NULL,
+    recorded_at  NVARCHAR(30)  NOT NULL,
+    readings     NVARCHAR(MAX) NOT NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
+    created_at   DATETIME2     DEFAULT GETDATE()
+);
+GO
+
+-- ── multi_leads_ecg_waveforms ─────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'multi_leads_ecg_waveforms')
+CREATE TABLE multi_leads_ecg_waveforms (
+    id           INT IDENTITY(1,1) PRIMARY KEY,
+    device_id    NVARCHAR(50)  NOT NULL,
+    recorded_at  NVARCHAR(30)  NOT NULL,
+    channels     INT           NOT NULL,
+    byte_len     INT           NOT NULL,
+    raw_data     NVARCHAR(MAX) NOT NULL,
+    user_id      INT           NULL,
+    company_id   INT           NULL,
+    created_at   DATETIME2     DEFAULT GETDATE()
+);
+GO
+
+-- ── third_party_readings ──────────────────────────────────────────────────────
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'third_party_readings')
+CREATE TABLE third_party_readings (
+    id             INT IDENTITY(1,1) PRIMARY KEY,
+    device_id      NVARCHAR(50)  NOT NULL,
+    mac_addr       NVARCHAR(50)  NOT NULL,
+    dev_name       NVARCHAR(100) NULL,
+    reading_type   NVARCHAR(30)  NOT NULL,
+    recorded_at    NVARCHAR(30)  NULL,
+    sbp            FLOAT         NULL,
+    dbp            FLOAT         NULL,
+    hr             FLOAT         NULL,
+    pulse          FLOAT         NULL,
+    weight         FLOAT         NULL,
+    impedance      FLOAT         NULL,
+    body_fat_pct   FLOAT         NULL,
+    spo2           FLOAT         NULL,
+    pi             FLOAT         NULL,
+    body_temp      FLOAT         NULL,
+    value          FLOAT         NULL,
+    user_id        INT           NULL,
+    company_id     INT           NULL,
+    created_at     DATETIME2     DEFAULT GETDATE()
 );
 GO
 
@@ -547,7 +697,9 @@ DECLARE @tables NVARCHAR(MAX) =
     'device_bp_alarm,device_temp_alarm,device_auto_af,device_goal,device_display,' +
     'device_bp_adjust,device_hr_interval,device_other_interval,device_gps_settings,' +
     'device_phonebook,device_clock_alarms,device_sedentary,' +
-    'sleep_calculations,ecg_calculations,af_calculations,spo2_calculations';
+    'sleep_calculations,ecg_calculations,af_calculations,spo2_calculations,' +
+    'ecg_waveforms,ppg_waveforms,acc_waveforms,' +
+    'rri_waveforms,spo2_waveforms,multi_leads_ecg_waveforms,third_party_readings';
 
 DECLARE @tbl NVARCHAR(200), @pos INT, @sql NVARCHAR(500);
 WHILE LEN(@tables) > 0

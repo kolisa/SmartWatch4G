@@ -76,5 +76,33 @@ public class OldManProcessor
                         track.Gnss.Longitude, track.Gnss.Latitude, locateType);
             }
         }
+
+        var sd = omInfo.SleepData;
+        if (sd != null && sd.HasCompleted && !string.IsNullOrEmpty(deviceId))
+        {
+            var recordDate = sd.HasSleepDate
+                ? DateTimeUtilities.FromUnixSeconds(sd.SleepDate.Seconds)[..10]
+                : rtTimeStr[..10];
+            var startTime = sd.HasStartTime ? DateTimeUtilities.FromUnixSeconds(sd.StartTime.Seconds) : null;
+            var endTime   = sd.HasEndTime   ? DateTimeUtilities.FromUnixSeconds(sd.EndTime.Seconds)   : null;
+
+            _logger.LogInformation(
+                "----{Date} sleep: deep:{Deep}m light:{Light}m weak:{Weak}m rem:{Rem}m score:{Score}",
+                recordDate, sd.DeepSleep, sd.LightSleep, sd.WeakSleep, sd.EyemoveSleep, sd.Score);
+
+            await _db.InsertSleepCalculation(
+                deviceId, recordDate, (int)sd.Completed,
+                startTime, endTime,
+                sd.HasSleepHr ? (int)sd.SleepHr : 0,
+                turnTimes: 0,
+                sd.HasAvgRespirationRate ? (double?)sd.AvgRespirationRate : null,
+                sd.HasMaxRespirationRate ? (double?)sd.MaxRespirationRate : null,
+                sd.HasMinRespirationRate ? (double?)sd.MinRespirationRate : null,
+                sectionsJson: null,
+                sd.HasDeepSleep    ? (int?)sd.DeepSleep    : null,
+                sd.HasLightSleep   ? (int?)sd.LightSleep   : null,
+                sd.HasWeakSleep    ? (int?)sd.WeakSleep    : null,
+                sd.HasEyemoveSleep ? (int?)sd.EyemoveSleep : null);
+        }
     }
 }

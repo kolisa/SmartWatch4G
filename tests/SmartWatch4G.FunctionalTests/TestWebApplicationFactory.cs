@@ -37,7 +37,10 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         public Task InsertGpsTrack(string d, string t, double lon, double lat, string loc) => Task.CompletedTask;
         public Task UpsertHealthSnapshot(string d, string rt,
             int? bat=null, int? rssi=null, int? stp=null, double? dist=null, double? cal=null,
-            int? ahr=null, int? xhr=null, int? nhr=null, int? spo=null, int? sbp=null, int? dbp=null, int? fat=null) => Task.CompletedTask;
+            int? ahr=null, int? xhr=null, int? nhr=null, int? spo=null, int? sbp=null, int? dbp=null, int? fat=null,
+            double? bte=null, int? bts=null, int? tty=null, int? bbp=null, double? bpk=null, double? bsg=null,
+            double? bzr=null, double? bzx=null, double? bzf=null, double? bzm=null, int? bzt=null,
+            double? brr=null, int? mld=null) => Task.CompletedTask;
         public Task InsertAlarm(string d, string t, string type, string? details=null) => Task.CompletedTask;
         public Task InsertSosEvent(string d, string t, double? lat, double? lon,
             string? num, int? status, string? start, string? end) => Task.CompletedTask;
@@ -45,7 +48,17 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
             string? model, string? ver, string? wear, string? sig, string raw) => Task.CompletedTask;
         public Task InsertSleepCalculation(string d, string rd, int comp,
             string? st, string? et, int hr, int tt,
-            double? ra, double? rx, double? rn, string? sec) => Task.CompletedTask;
+            double? ra, double? rx, double? rn, string? sec,
+            int? deep=null, int? light=null, int? weak=null, int? eye=null) => Task.CompletedTask;
+        public Task InsertEcgWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
+        public Task InsertPpgWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
+        public Task InsertAccWaveform(string d, string ra, int sc, string? ax, string? ay, string? az) => Task.CompletedTask;
+        public Task InsertRriWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
+        public Task InsertSpo2Waveform(string d, string ra, string json) => Task.CompletedTask;
+        public Task InsertMultiLeadsEcgWaveform(string d, string ra, int ch, int bl, string raw) => Task.CompletedTask;
+        public Task InsertThirdPartyReading(string d, string mac, string? devName, string rt,
+            string? ra, double? sbp, double? dbp, double? hr, double? pulse,
+            double? wgt, double? imp, double? bfp, double? spo2, double? pi, double? btm, double? val) => Task.CompletedTask;
         public Task InsertEcgCalculation(string d, int result, int hr, int eff, int dir) => Task.CompletedTask;
         public Task InsertAfCalculation(string d, int result) => Task.CompletedTask;
         public Task InsertSpo2Calculation(string d, double score, int? risk) => Task.CompletedTask;
