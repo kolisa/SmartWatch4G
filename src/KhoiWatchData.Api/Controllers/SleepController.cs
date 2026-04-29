@@ -1,8 +1,10 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Application.Utilities;
 
 namespace KhoiWatchData.Api.Controllers;
 
+[ApiVersionNeutral]
 [ApiController]
 [Route("health/sleep")]
 public class SleepController : ControllerBase
@@ -14,6 +16,7 @@ public class SleepController : ControllerBase
         _logger = logger;
     }
 
+    [HttpGet]
     public IActionResult GetSleepResult([FromQuery] string deviceid, [FromQuery] string sleep_date)
     {
         // Validate inputs

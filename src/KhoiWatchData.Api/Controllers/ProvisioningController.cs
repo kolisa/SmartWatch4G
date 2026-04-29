@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Application.Interfaces;
 
@@ -11,6 +12,7 @@ namespace KhoiWatchData.Api.Controllers;
 /// returns ReturnCode 0. Settings are saved locally only on success.
 /// Runs automatically 3× daily (06:00, 12:00, 18:00 UTC) via DeviceProvisioningJob.
 /// </summary>
+[ApiVersionNeutral]
 [ApiController]
 [Route("provisioning")]
 public sealed class ProvisioningController : ControllerBase

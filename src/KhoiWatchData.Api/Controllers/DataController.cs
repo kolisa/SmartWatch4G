@@ -1,10 +1,12 @@
 using System.Text;
+using Asp.Versioning;
 using KhoiWatchData.Api.Storage;
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Infrastructure.Processors;
 
 namespace KhoiWatchData.Api.Controllers;
 
+[ApiVersionNeutral]
 [Route("pb/upload")]
 [ApiController]
 public class DataController : ControllerBase

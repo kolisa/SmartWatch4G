@@ -65,7 +65,7 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
                 _statusCache.SetStatus(w.DeviceId, isOnline);
                 return MapSummary(w, data[i].health, data[i].track, isOnline);
             })
-            .OrderBy(x => x.StatusCode == 1 ? 0 : 1)
+            .OrderByDescending(x => x.StatusCode)
             .ThenBy(x => x.Name)
             .ThenBy(x => x.Surname)
             .ToArray();

@@ -1,11 +1,13 @@
 using System.Text;
 using System.Text.Json;
+using Asp.Versioning;
 using KhoiWatchData.Api.Storage;
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Application.DTOs;
 
 namespace KhoiWatchData.Api.Controllers;
 
+[ApiVersionNeutral]
 [Route("status/notify")]
 [ApiController]
 public class DeviceStatusController : ControllerBase

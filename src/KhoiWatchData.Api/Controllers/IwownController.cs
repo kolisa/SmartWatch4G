@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Application.DTOs;
 using SmartWatch4G.Application.Interfaces;
@@ -5,6 +6,7 @@ using SmartWatch4G.Infrastructure.Services;
 
 namespace KhoiWatchData.Api.Controllers;
 
+[ApiVersionNeutral]
 [ApiController]
 [Route("iwown")]
 public class IwownController : ControllerBase
