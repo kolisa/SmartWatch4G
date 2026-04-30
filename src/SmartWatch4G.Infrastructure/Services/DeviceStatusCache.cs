@@ -45,4 +45,16 @@ public sealed class DeviceStatusCache : IDeviceStatusCache
 
     public IReadOnlyList<string> GetAllDeviceIds() =>
         _cache.Keys.ToList();
+
+    public (int Online, int Offline) GetCounts()
+    {
+        var now = System.DateTime.UtcNow;
+        int online = 0, offline = 0;
+        foreach (var entry in _cache.Values)
+        {
+            if (now - entry.UpdatedAt > MaxAge || !entry.IsOnline) offline++;
+            else online++;
+        }
+        return (online, offline);
+    }
 }

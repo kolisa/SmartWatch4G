@@ -1886,48 +1886,41 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         return list;
     }
 
-    public async Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCounts(int withinHours)
+    public async Task<(int TotalWorkers, int SosCount, int HrAlertCount, int TrackedOnMap)> GetDashboardCounts(
+        int withinHours, int? companyId = null)
     {
         try
         {
             await using var conn = await OpenAsync();
             using var cmd = new SqlCommand(@"
                 SELECT
-                    (SELECT COUNT(*) FROM user_profiles WHERE is_active = 1),
-                    (SELECT COUNT(*) FROM alarms       WHERE created_at >= DATEADD(HOUR, -@h, GETDATE())),
-                    (SELECT COUNT(*) FROM sos_events   WHERE created_at >= DATEADD(HOUR, -@h, GETDATE()))", conn);
+                    (SELECT COUNT(*)
+                     FROM   user_profiles
+                     WHERE  is_active = 1
+                       AND  (@cid IS NULL OR company_id = @cid)),
+                    (SELECT COUNT(*)
+                     FROM   sos_events
+                     WHERE  created_at >= DATEADD(HOUR, -@h, GETDATE())
+                       AND  (@cid IS NULL OR company_id = @cid)),
+                    (SELECT COUNT(*)
+                     FROM   alarms
+                     WHERE  alarm_type = 'hr_alarm'
+                       AND  created_at >= DATEADD(HOUR, -@h, GETDATE())
+                       AND  (@cid IS NULL OR company_id = @cid)),
+                    (SELECT COUNT(DISTINCT device_id)
+                     FROM   gps_tracks
+                     WHERE  created_at >= DATEADD(HOUR, -@h, GETDATE())
+                       AND  (@cid IS NULL OR company_id = @cid))", conn);
+            cmd.Parameters.Add("@cid", System.Data.SqlDbType.Int).Value = (object?)companyId ?? DBNull.Value;
             cmd.Parameters.AddWithValue("@h", withinHours);
             await using var r = await cmd.ExecuteReaderAsync();
-            if (!await r.ReadAsync()) return (0, 0, 0);
-            return (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2));
+            if (!await r.ReadAsync()) return (0, 0, 0, 0);
+            return (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2), r.GetInt32(3));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetDashboardCounts failed.");
-            return (0, 0, 0);
-        }
-    }
-
-    public async Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCountsByCompany(int withinHours, int companyId)
-    {
-        try
-        {
-            await using var conn = await OpenAsync();
-            using var cmd = new SqlCommand(@"
-                SELECT
-                    (SELECT COUNT(*) FROM user_profiles WHERE is_active=1 AND company_id=@cid),
-                    (SELECT COUNT(*) FROM alarms       WHERE company_id=@cid AND created_at >= DATEADD(HOUR, -@h, GETDATE())),
-                    (SELECT COUNT(*) FROM sos_events   WHERE company_id=@cid AND created_at >= DATEADD(HOUR, -@h, GETDATE()))", conn);
-            cmd.Parameters.AddWithValue("@h",   withinHours);
-            cmd.Parameters.AddWithValue("@cid", companyId);
-            await using var r = await cmd.ExecuteReaderAsync();
-            if (!await r.ReadAsync()) return (0, 0, 0);
-            return (r.GetInt32(0), r.GetInt32(1), r.GetInt32(2));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "GetDashboardCountsByCompany failed for {Id}", companyId);
-            return (0, 0, 0);
+            _logger.LogError(ex, "GetDashboardCounts failed");
+            return (0, 0, 0, 0);
         }
     }
 

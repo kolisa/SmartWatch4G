@@ -16,4 +16,12 @@ public interface IDeviceStatusCache
 
     /// <summary>Returns all device IDs currently tracked in the cache.</summary>
     IReadOnlyList<string> GetAllDeviceIds();
+
+    /// <summary>
+    /// Returns the count of online and offline devices currently in the cache.
+    /// When companyId is null, counts all tracked devices.
+    /// When companyId is provided, counts only devices whose IDs are in the company
+    /// (requires the caller to supply the device list, or use the overload).
+    /// </summary>
+    (int Online, int Offline) GetCounts();
 }

@@ -19,18 +19,41 @@ public sealed class DashboardService : IDashboardService
         _logger = logger;
     }
 
+    public async Task<ServiceResult<DashboardStatsResponse>> GetStatsAsync(
+        int? companyId, int onlineCount, int offlineCount)
+    {
+        try
+        {
+            var (total, sos, hrAlerts, tracked) =
+                await _db.GetDashboardCounts(AlertWindowHours, companyId);
+
+            return ServiceResult<DashboardStatsResponse>.Ok(new DashboardStatsResponse
+            {
+                TotalCount        = total,
+                OnlineCount       = onlineCount,
+                OfflineCount      = offlineCount,
+                WorkersInDistress = sos,
+                HrAlertCount      = hrAlerts,
+                TrackedOnMap      = tracked
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetStatsAsync failed");
+            return ServiceResult<DashboardStatsResponse>.Fail("An unexpected error occurred.", 500);
+        }
+    }
+
     public async Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync(int? companyId = null)
     {
         try
         {
-            var (workers, alarms, sos) = companyId.HasValue
-                ? await _db.GetDashboardCountsByCompany(AlertWindowHours, companyId.Value)
-                : await _db.GetDashboardCounts(AlertWindowHours);
+            var (workers, sos, _, _) = await _db.GetDashboardCounts(AlertWindowHours, companyId);
 
             return ServiceResult<DashboardSummaryResponse>.Ok(new DashboardSummaryResponse
             {
                 TotalWorkers      = workers,
-                ActiveAlerts      = alarms,
+                ActiveAlerts      = sos,
                 SosCount          = sos,
                 WorkersInDistress = sos
             });

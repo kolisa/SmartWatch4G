@@ -115,12 +115,11 @@ public interface IDatabaseService
     Task<IReadOnlyList<AlarmEvent>> GetRecentAlarms(int withinHours, int limit);
 
     /// <summary>
-    /// Returns worker count, alarm count, and SOS count for the given time window
-    /// in a single round trip — avoids three separate COUNT queries for the dashboard.
+    /// Returns dashboard stats in a single round trip:
+    /// total workers, SOS count, HR alert count, and devices tracked on map (GPS in last 24 h).
+    /// Online/offline counts are supplied by the caller from IDeviceStatusCache.
     /// </summary>
-    Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCounts(int withinHours);
-
-    Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCountsByCompany(int withinHours, int companyId);
+    Task<(int TotalWorkers, int SosCount, int HrAlertCount, int TrackedOnMap)> GetDashboardCounts(int withinHours, int? companyId = null);
 
     // ── GPS queries ───────────────────────────────────────────────────────────
 

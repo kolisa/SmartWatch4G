@@ -101,8 +101,7 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         public Task<int> GetRecentAlarmCount(int withinHours) => Task.FromResult(0);
         public Task<int> GetRecentSosCount(int withinHours) => Task.FromResult(0);
         public Task<IReadOnlyList<SmartWatch4G.Domain.Entities.AlarmEvent>> GetRecentAlarms(int withinHours, int limit) => Task.FromResult<IReadOnlyList<SmartWatch4G.Domain.Entities.AlarmEvent>>([]);
-        public Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCounts(int withinHours) => Task.FromResult((0, 0, 0));
-        public Task<(int TotalWorkers, int AlarmCount, int SosCount)> GetDashboardCountsByCompany(int withinHours, int companyId) => Task.FromResult((0, 0, 0));
+        public Task<(int TotalWorkers, int SosCount, int HrAlertCount, int TrackedOnMap)> GetDashboardCounts(int withinHours, int? companyId = null) => Task.FromResult((0, 0, 0, 0));
 
         // GPS queries
         public Task<(IReadOnlyList<(string DeviceId, string? UserName, SmartWatch4G.Domain.Entities.GnssTrack Track)> Items, int TotalCount)>

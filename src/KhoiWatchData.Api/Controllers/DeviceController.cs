@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Application.Interfaces;
+using SmartWatch4G.Domain.Interfaces;
 
 namespace KhoiWatchData.Api.Controllers;
 
@@ -13,10 +14,17 @@ namespace KhoiWatchData.Api.Controllers;
 public sealed class DeviceController : ControllerBase
 {
     private readonly IUserProfileQueryService _deviceService;
+    private readonly IDashboardService _dashboardService;
+    private readonly IDeviceStatusCache _statusCache;
 
-    public DeviceController(IUserProfileQueryService deviceService)
+    public DeviceController(
+        IUserProfileQueryService deviceService,
+        IDashboardService dashboardService,
+        IDeviceStatusCache statusCache)
     {
-        _deviceService = deviceService;
+        _deviceService    = deviceService;
+        _dashboardService = dashboardService;
+        _statusCache      = statusCache;
     }
 
     /// <summary>
@@ -95,6 +103,23 @@ public sealed class DeviceController : ControllerBase
             return StatusCode(500, new { message = result.Error });
 
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Returns aggregate dashboard statistics:
+    /// online/offline/total device counts, workers in distress (SOS),
+    /// HR alert count, and devices tracked on map — all over the last 24 h.
+    /// Optionally filter by company.
+    /// </summary>
+    [HttpGet("dashboard-stats")]
+    public async Task<IActionResult> GetDashboardStats([FromQuery] int? companyId = null)
+    {
+        var (online, offline) = _statusCache.GetCounts();
+        var result = await _dashboardService.GetStatsAsync(companyId, online, offline);
+        if (result.IsFailure)
+            return StatusCode(500, new { message = result.Error });
+
+        return Ok(new { isSuccess = true, data = result.Value });
     }
 
     /// <summary>
