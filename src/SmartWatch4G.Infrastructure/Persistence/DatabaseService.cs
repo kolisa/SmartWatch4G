@@ -1740,6 +1740,86 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         return list;
     }
 
+    public async Task<(IReadOnlyList<UserProfileWithData> Items, int TotalCount)> GetPagedUserProfilesWithData(
+        int skip, int take, int? companyId)
+    {
+        var list = new List<UserProfileWithData>();
+        int total = 0;
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                SELECT
+                    COUNT(*) OVER ()        AS total_count,
+                    u.device_id, u.user_id, u.name, u.surname,
+                    u.email, u.cell, u.emp_no, u.address,
+                    u.company_id, c.name    AS company_name, u.updated_at,
+                    h.battery, h.avg_hr, h.max_hr, h.min_hr,
+                    h.avg_spo2, h.sbp, h.dbp, h.steps,
+                    h.distance, h.calorie, h.fatigue, h.created_at AS health_at,
+                    g.longitude, g.latitude, g.gnss_time
+                FROM user_profiles u
+                LEFT JOIN companies c ON c.id = u.company_id
+                OUTER APPLY (
+                    SELECT TOP 1
+                        battery, avg_hr, max_hr, min_hr, avg_spo2,
+                        sbp, dbp, steps, distance, calorie, fatigue, created_at
+                    FROM health_snapshots
+                    WHERE device_id = u.device_id
+                    ORDER BY id DESC
+                ) h
+                OUTER APPLY (
+                    SELECT TOP 1 longitude, latitude, gnss_time
+                    FROM gps_tracks
+                    WHERE device_id = u.device_id
+                    ORDER BY id DESC
+                ) g
+                WHERE u.is_active = 1
+                  AND (@cid IS NULL OR u.company_id = @cid)
+                ORDER BY u.surname, u.name
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
+            cmd.Parameters.Add("@cid",  System.Data.SqlDbType.Int).Value = (object?)companyId ?? DBNull.Value;
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                if (total == 0) total = r.GetInt32(0);
+                list.Add(new UserProfileWithData
+                {
+                    DeviceId    = r.GetString(1),
+                    UserId      = r.GetInt32(2),
+                    Name        = r.GetString(3),
+                    Surname     = r.GetString(4),
+                    Email       = r.IsDBNull(5)  ? null : r.GetString(5),
+                    Cell        = r.IsDBNull(6)  ? null : r.GetString(6),
+                    EmpNo       = r.IsDBNull(7)  ? null : r.GetString(7),
+                    Address     = r.IsDBNull(8)  ? null : r.GetString(8),
+                    CompanyId   = r.IsDBNull(9)  ? null : r.GetInt32(9),
+                    CompanyName = r.IsDBNull(10) ? null : r.GetString(10),
+                    UpdatedAt   = r.GetDateTime(11),
+                    Battery     = r.IsDBNull(12) ? null : r.GetInt32(12),
+                    AvgHr       = r.IsDBNull(13) ? null : r.GetInt32(13),
+                    MaxHr       = r.IsDBNull(14) ? null : r.GetInt32(14),
+                    MinHr       = r.IsDBNull(15) ? null : r.GetInt32(15),
+                    AvgSpo2     = r.IsDBNull(16) ? null : r.GetInt32(16),
+                    Sbp         = r.IsDBNull(17) ? null : r.GetInt32(17),
+                    Dbp         = r.IsDBNull(18) ? null : r.GetInt32(18),
+                    Steps       = r.IsDBNull(19) ? null : r.GetInt32(19),
+                    Distance    = r.IsDBNull(20) ? null : r.GetDouble(20),
+                    Calorie     = r.IsDBNull(21) ? null : r.GetDouble(21),
+                    Fatigue     = r.IsDBNull(22) ? null : r.GetInt32(22),
+                    HealthAt    = r.IsDBNull(23) ? null : r.GetDateTime(23),
+                    Longitude   = r.IsDBNull(24) ? null : r.GetDouble(24),
+                    Latitude    = r.IsDBNull(25) ? null : r.GetDouble(25),
+                    GnssTime    = r.IsDBNull(26) ? null : r.GetString(26),
+                });
+            }
+        }
+        catch (Exception ex) { _logger.LogError(ex, "GetPagedUserProfilesWithData failed"); }
+        return (list, total);
+    }
+
     public async Task<int> GetRecentAlarmCount(int withinHours)
     {
         try

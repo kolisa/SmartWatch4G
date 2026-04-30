@@ -99,6 +99,13 @@ public interface IDatabaseService
 
     Task<IReadOnlyList<UserProfile>> GetPagedUserProfiles(int skip, int take);
 
+    /// <summary>
+    /// Returns paged user profiles combined with their latest health snapshot and GPS track
+    /// in a single round trip using OUTER APPLY. Avoids N+1 queries per device.
+    /// </summary>
+    Task<(IReadOnlyList<UserProfileWithData> Items, int TotalCount)> GetPagedUserProfilesWithData(
+        int skip, int take, int? companyId);
+
     Task<IReadOnlyList<UserProfile>> GetPagedUserProfilesByCompany(int skip, int take, int companyId);
 
     Task<int> GetRecentAlarmCount(int withinHours);

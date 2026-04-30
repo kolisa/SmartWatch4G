@@ -27,43 +27,41 @@ public sealed class UserProfileQueryService : IUserProfileQueryService
 
     public async Task<ServiceResult<PagedResult<UserProfileSummaryResponse>>> GetPagedUserProfilesAsync(int page, int pageSize, int? companyId = null)
     {
-        if (page < 1)     page     = 1;
-        if (pageSize < 1) pageSize = 10;
+        if (page < 1)       page     = 1;
+        if (pageSize < 1)   pageSize = 10;
         if (pageSize > 100) pageSize = 100;
 
         try
         {
             var skip = (page - 1) * pageSize;
-            int total;
-            IReadOnlyList<UserProfile> workers;
 
-            if (companyId.HasValue)
-            {
-                total   = await _db.GetActiveWorkerCountByCompany(companyId.Value);
-                workers = await _db.GetPagedUserProfilesByCompany(skip, pageSize, companyId.Value);
-            }
-            else
-            {
-                total   = await _db.GetActiveWorkerCount();
-                workers = await _db.GetPagedUserProfiles(skip, pageSize);
-            }
+            // Single DB round trip: profiles + latest health + latest GPS via OUTER APPLY
+            var (rows, total) = await _db.GetPagedUserProfilesWithData(skip, pageSize, companyId);
 
-            // Fetch health, GPS, and Iwown status in parallel across all devices on the page
-            var statusTasks = workers.Select(w => _iwown.GetDeviceStatusAsync(w.DeviceId)).ToArray();
-            var dataTask = Task.WhenAll(workers.Select(async w =>
+            var items = rows.Select(row =>
             {
-                var health = await _db.GetLatestHealthSnapshot(w.DeviceId);
-                var track  = await _db.GetLatestGnssTrack(w.DeviceId);
-                return (health, track);
-            }));
-            await Task.WhenAll(Task.WhenAll(statusTasks), dataTask);
-
-            var data  = dataTask.Result;
-            var items = workers.Select((w, i) =>
-            {
-                var isOnline = DeviceStatusParser.IsOnline(statusTasks[i].Result);
-                _statusCache.SetStatus(w.DeviceId, isOnline);
-                return MapSummary(w, data[i].health, data[i].track, isOnline);
+                // Use cached status from background polling job — no live Iwown HTTP call per device
+                var isOnline = _statusCache.GetStatus(row.DeviceId) == "online";
+                return new UserProfileSummaryResponse
+                {
+                    DeviceId         = row.DeviceId,
+                    Name             = row.Name,
+                    Surname          = row.Surname,
+                    EmpNo            = row.EmpNo,
+                    Status           = isOnline ? "online" : "offline",
+                    StatusCode       = isOnline ? 1 : 0,
+                    LatestLatitude   = row.Latitude,
+                    LatestLongitude  = row.Longitude,
+                    LatestGnssTime   = row.GnssTime,
+                    SpO2             = row.AvgSpo2,
+                    Steps            = row.Steps,
+                    HeartRate        = row.AvgHr,
+                    Fatigue          = row.Fatigue,
+                    Battery          = row.Battery,
+                    Sbp              = row.Sbp,
+                    Dbp              = row.Dbp,
+                    HealthRecordedAt = row.HealthAt
+                };
             })
             .OrderByDescending(x => x.StatusCode)
             .ThenBy(x => x.Name)
