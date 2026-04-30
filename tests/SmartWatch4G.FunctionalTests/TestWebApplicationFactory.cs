@@ -34,39 +34,39 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     private sealed class NoOpDatabaseService : IDatabaseService
     {
-        public Task InsertGpsTrack(string d, string t, double lon, double lat, string loc) => Task.CompletedTask;
-        public Task UpsertHealthSnapshot(string d, string rt,
-            int? bat=null, int? rssi=null, int? stp=null, double? dist=null, double? cal=null,
-            int? ahr=null, int? xhr=null, int? nhr=null, int? spo=null, int? sbp=null, int? dbp=null, int? fat=null,
-            double? bte=null, int? bts=null, int? tty=null, int? bbp=null, double? bpk=null, double? bsg=null,
-            double? bzr=null, double? bzx=null, double? bzf=null, double? bzm=null, int? bzt=null,
-            double? brr=null, int? mld=null) => Task.CompletedTask;
-        public Task InsertAlarm(string d, string t, string type, string? details=null) => Task.CompletedTask;
-        public Task InsertSosEvent(string d, string t, double? lat, double? lon,
-            string? num, int? status, string? start, string? end) => Task.CompletedTask;
-        public Task InsertDeviceInfo(string d, string rat,
-            string? model, string? ver, string? wear, string? sig, string raw) => Task.CompletedTask;
-        public Task InsertSleepCalculation(string d, string rd, int comp,
-            string? st, string? et, int hr, int tt,
-            double? ra, double? rx, double? rn, string? sec,
-            int? deep=null, int? light=null, int? weak=null, int? eye=null) => Task.CompletedTask;
+        public Task InsertGpsTrack(string deviceId, string gnssTime, double longitude, double latitude, string locType) => Task.CompletedTask;
+        public Task UpsertHealthSnapshot(string deviceId, string recordTime,
+            int? battery=null, int? rssi=null, int? steps=null, double? distance=null, double? calorie=null,
+            int? avgHr=null, int? maxHr=null, int? minHr=null, int? avgSpo2=null, int? sbp=null, int? dbp=null, int? fatigue=null,
+            double? bodyTempEvi=null, int? bodyTempEsti=null, int? tempType=null, int? bpBpm=null, double? bloodPotassium=null, double? bloodSugar=null,
+            double? biozR=null, double? biozX=null, double? biozFat=null, double? biozBmi=null, int? biozType=null,
+            double? breathRate=null, int? moodLevel=null) => Task.CompletedTask;
+        public Task InsertAlarm(string deviceId, string alarmTime, string alarmType, string? details=null) => Task.CompletedTask;
+        public Task InsertSosEvent(string deviceId, string alarmTime, double? lat, double? lon,
+            string? callNumber, int? callStatus, string? callStart, string? callEnd) => Task.CompletedTask;
+        public Task InsertDeviceInfo(string deviceId, string recordedAt,
+            string? model, string? version, string? wearingStatus, string? signal, string rawJson) => Task.CompletedTask;
+        public Task InsertSleepCalculation(string deviceId, string recordDate, int completed,
+            string? startTime, string? endTime, int hr, int turnTimes,
+            double? respAvg, double? respMax, double? respMin, string? sectionsJson,
+            int? deepSleep=null, int? lightSleep=null, int? weakSleep=null, int? eyemoveSleep=null) => Task.CompletedTask;
         public Task<SmartWatch4G.Domain.Entities.SleepCalculation?> GetSleepCalculation(string deviceId, string sleepDate)
             => Task.FromResult<SmartWatch4G.Domain.Entities.SleepCalculation?>(null);
         public Task<(IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfileWithData> Items, int TotalCount)>
             GetPagedUserProfilesWithData(int skip, int take, int? companyId)
             => Task.FromResult<(IReadOnlyList<SmartWatch4G.Domain.Entities.UserProfileWithData>, int)>(([], 0));
-        public Task InsertEcgWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
-        public Task InsertPpgWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
-        public Task InsertAccWaveform(string d, string ra, int sc, string? ax, string? ay, string? az) => Task.CompletedTask;
-        public Task InsertRriWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
-        public Task InsertSpo2Waveform(string d, string ra, string json) => Task.CompletedTask;
-        public Task InsertMultiLeadsEcgWaveform(string d, string ra, int ch, int bl, string raw) => Task.CompletedTask;
-        public Task InsertThirdPartyReading(string d, string mac, string? devName, string rt,
-            string? ra, double? sbp, double? dbp, double? hr, double? pulse,
-            double? wgt, double? imp, double? bfp, double? spo2, double? pi, double? btm, double? val) => Task.CompletedTask;
-        public Task InsertEcgCalculation(string d, int result, int hr, int eff, int dir) => Task.CompletedTask;
-        public Task InsertAfCalculation(string d, int result) => Task.CompletedTask;
-        public Task InsertSpo2Calculation(string d, double score, int? risk) => Task.CompletedTask;
+        public Task InsertEcgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson) => Task.CompletedTask;
+        public Task InsertPpgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson) => Task.CompletedTask;
+        public Task InsertAccWaveform(string deviceId, string recordedAt, int sampleCount, string? accXBase64, string? accYBase64, string? accZBase64) => Task.CompletedTask;
+        public Task InsertRriWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson) => Task.CompletedTask;
+        public Task InsertSpo2Waveform(string deviceId, string recordedAt, string readingsJson) => Task.CompletedTask;
+        public Task InsertMultiLeadsEcgWaveform(string deviceId, string recordedAt, int channels, int byteLen, string rawBase64) => Task.CompletedTask;
+        public Task InsertThirdPartyReading(string deviceId, string macAddr, string? devName, string readingType,
+            string? recordedAt, double? sbp, double? dbp, double? hr, double? pulse,
+            double? weight, double? impedance, double? bodyFatPct, double? spo2, double? pi, double? bodyTemp, double? value) => Task.CompletedTask;
+        public Task InsertEcgCalculation(string deviceId, int result, int hr, int effective, int direction) => Task.CompletedTask;
+        public Task InsertAfCalculation(string deviceId, int result) => Task.CompletedTask;
+        public Task InsertSpo2Calculation(string deviceId, double spo2Score, int? oshahsRisk) => Task.CompletedTask;
 
         // User profile methods
         public Task UpsertUserProfile(string deviceId, string name, string surname,
