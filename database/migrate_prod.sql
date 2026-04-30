@@ -516,7 +516,21 @@ END
 GO
 
 -- =============================================================================
--- 8. Verification: row counts and link coverage per table
+-- 8. NEW COLUMNS: sleep_calculations — deep/light/weak/eyemove_sleep
+--    These were missing from the original CREATE TABLE, causing silent INSERT
+--    failures. Safe to re-run: each ALTER is guarded by COL_LENGTH check.
+-- =============================================================================
+IF COL_LENGTH('sleep_calculations','deep_sleep')    IS NULL ALTER TABLE sleep_calculations ADD deep_sleep    INT NULL;
+IF COL_LENGTH('sleep_calculations','light_sleep')   IS NULL ALTER TABLE sleep_calculations ADD light_sleep   INT NULL;
+IF COL_LENGTH('sleep_calculations','weak_sleep')    IS NULL ALTER TABLE sleep_calculations ADD weak_sleep    INT NULL;
+IF COL_LENGTH('sleep_calculations','eyemove_sleep') IS NULL ALTER TABLE sleep_calculations ADD eyemove_sleep INT NULL;
+GO
+
+PRINT N'sleep_calculations: deep/light/weak/eyemove_sleep columns ensured.';
+GO
+
+-- =============================================================================
+-- 9. Verification: row counts and link coverage per table
 -- =============================================================================
 SELECT
     t.name                                                          AS table_name,
