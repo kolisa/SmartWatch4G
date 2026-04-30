@@ -9,21 +9,34 @@ namespace SmartWatch4G.Infrastructure.Services;
 public sealed class DashboardService : IDashboardService
 {
     private readonly IDatabaseService _db;
+    private readonly IwownService _iwown;
     private readonly ILogger<DashboardService> _logger;
 
     private const int AlertWindowHours = 24;
 
-    public DashboardService(IDatabaseService db, ILogger<DashboardService> logger)
+    public DashboardService(IDatabaseService db, IwownService iwown, ILogger<DashboardService> logger)
     {
         _db     = db;
+        _iwown  = iwown;
         _logger = logger;
     }
 
-    public async Task<ServiceResult<DashboardStatsResponse>> GetStatsAsync(
-        int? companyId, int onlineCount, int offlineCount)
+    public async Task<ServiceResult<DashboardStatsResponse>> GetStatsAsync(int? companyId = null)
     {
         try
         {
+            // Fan-out real-time status calls to Iwown for all active devices
+            var allProfiles = await _db.GetAllUserProfiles();
+            var profiles = companyId.HasValue
+                ? allProfiles.Where(p => p.CompanyId == companyId).ToList()
+                : allProfiles;
+
+            var statusTasks = profiles.Select(p => _iwown.GetDeviceStatusAsync(p.DeviceId));
+            var responses   = await Task.WhenAll(statusTasks);
+
+            int onlineCount  = responses.Count(r => DeviceStatusParser.IsOnline(r));
+            int offlineCount = profiles.Count - onlineCount;
+
             var (total, sos, hrAlerts, tracked) =
                 await _db.GetDashboardCounts(AlertWindowHours, companyId);
 

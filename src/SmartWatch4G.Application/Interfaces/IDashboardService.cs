@@ -5,7 +5,11 @@ namespace SmartWatch4G.Application.Interfaces;
 
 public interface IDashboardService
 {
-    Task<ServiceResult<DashboardStatsResponse>> GetStatsAsync(int? companyId, int onlineCount, int offlineCount);
+    /// <summary>
+    /// Returns real-time dashboard stats by querying the Iwown device/status API
+    /// for every active device in parallel.
+    /// </summary>
+    Task<ServiceResult<DashboardStatsResponse>> GetStatsAsync(int? companyId = null);
 
     /// <summary>Legacy summary used by FleetController.</summary>
     Task<ServiceResult<DashboardSummaryResponse>> GetSummaryAsync(int? companyId = null);

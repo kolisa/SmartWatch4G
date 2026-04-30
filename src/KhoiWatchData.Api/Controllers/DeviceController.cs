@@ -15,16 +15,13 @@ public sealed class DeviceController : ControllerBase
 {
     private readonly IUserProfileQueryService _deviceService;
     private readonly IDashboardService _dashboardService;
-    private readonly IDeviceStatusCache _statusCache;
 
     public DeviceController(
         IUserProfileQueryService deviceService,
-        IDashboardService dashboardService,
-        IDeviceStatusCache statusCache)
+        IDashboardService dashboardService)
     {
         _deviceService    = deviceService;
         _dashboardService = dashboardService;
-        _statusCache      = statusCache;
     }
 
     /// <summary>
@@ -114,8 +111,7 @@ public sealed class DeviceController : ControllerBase
     [HttpGet("dashboard-stats")]
     public async Task<IActionResult> GetDashboardStats([FromQuery] int? companyId = null)
     {
-        var (online, offline) = _statusCache.GetCounts();
-        var result = await _dashboardService.GetStatsAsync(companyId, online, offline);
+        var result = await _dashboardService.GetStatsAsync(companyId);
         if (result.IsFailure)
             return StatusCode(500, new { message = result.Error });
 
