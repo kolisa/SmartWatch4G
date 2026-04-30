@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Application.Utilities;
+using SmartWatch4G.Domain.Interfaces;
 
 namespace KhoiWatchData.Api.Controllers;
 
@@ -10,62 +11,55 @@ namespace KhoiWatchData.Api.Controllers;
 public class SleepController : ControllerBase
 {
     private readonly ILogger<SleepController> _logger;
+    private readonly IDatabaseService _db;
 
-    public SleepController(ILogger<SleepController> logger)
+    public SleepController(ILogger<SleepController> logger, IDatabaseService db)
     {
         _logger = logger;
+        _db     = db;
     }
 
     [HttpGet]
-    public IActionResult GetSleepResult([FromQuery] string deviceid, [FromQuery] string sleep_date)
+    public async Task<IActionResult> GetSleepResult([FromQuery] string deviceid, [FromQuery] string sleep_date)
     {
-        // Validate inputs
+        _logger.LogInformation("GetSleepResult request: deviceid={DeviceId} sleep_date={SleepDate}",
+            deviceid, sleep_date);
+
         if (string.IsNullOrEmpty(deviceid) || !DateTimeUtilities.IsValidDate(sleep_date))
         {
-            return Ok(new
-            {
-                ReturnCode = 10002
-            });
+            _logger.LogWarning("GetSleepResult bad params: deviceid={DeviceId} sleep_date={SleepDate}",
+                deviceid, sleep_date);
+            return Ok(new { ReturnCode = 10002 });
         }
 
-        _logger.LogInformation($"getSleepResult {deviceid} {sleep_date}");
+        var record = await _db.GetSleepCalculation(deviceid, sleep_date);
 
-        // Simulate data availability check
-        bool dataExist = true; // Replace with actual logic to check data availability
+        _logger.LogInformation("GetSleepResult DB result for {DeviceId} {SleepDate}: {Found}",
+            deviceid, sleep_date, record is not null ? "found" : "not found");
 
-        if (dataExist)
+        if (record is null)
+            return Ok(new { ReturnCode = 10404 });
+
+        string prevDay = DateTimeUtilities.GetPreviousDay(sleep_date);
+
+        return Ok(new
         {
-            string prevDay = DateTimeUtilities.GetPreviousDay(sleep_date);
-
-            // Build the sleep data response
-            var sleepData = new
+            ReturnCode = 0,
+            Data = new
             {
-                deviceid = deviceid,
-                sleep_date = sleep_date,
-                start_time = $"{prevDay} 23:15:00",
-                end_time = $"{sleep_date} 07:00:00",
-                deep_sleep = 85,
-                light_sleep = 300,
-                weak_sleep = 30,
-                eyemove_sleep = 50,
-                score = 80,
-                osahs_risk = 0,
-                spo2_score = 0,
-                sleep_hr = 60
-            };
-
-            return Ok(new
-            {
-                ReturnCode = 0,
-                Data = sleepData
-            });
-        }
-        else
-        {
-            return Ok(new
-            {
-                ReturnCode = 10404
-            });
-        }
+                deviceid     = record.DeviceId,
+                sleep_date   = record.RecordDate,
+                start_time   = record.StartTime ?? $"{prevDay} 00:00:00",
+                end_time     = record.EndTime   ?? $"{sleep_date} 00:00:00",
+                deep_sleep   = record.DeepSleep   ?? 0,
+                light_sleep  = record.LightSleep  ?? 0,
+                weak_sleep   = record.WeakSleep   ?? 0,
+                eyemove_sleep = record.EyemoveSleep ?? 0,
+                score        = 0,
+                osahs_risk   = 0,
+                spo2_score   = 0,
+                sleep_hr     = record.Hr
+            }
+        });
     }
 }

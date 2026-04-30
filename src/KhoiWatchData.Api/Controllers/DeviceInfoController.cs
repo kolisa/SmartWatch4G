@@ -1,9 +1,8 @@
 using Asp.Versioning;
-using System.Text;
 using System.Text.Json;
-using KhoiWatchData.Api.Storage;
 using Microsoft.AspNetCore.Mvc;
 using SmartWatch4G.Application.DTOs;
+using SmartWatch4G.Domain.Interfaces;
 
 namespace KhoiWatchData.Api.Controllers;
 
@@ -12,40 +11,47 @@ namespace KhoiWatchData.Api.Controllers;
 [ApiController]
 public class DeviceInfoController : ControllerBase
 {
-    private readonly ILogger<DeviceInfoController> logger;
+    private readonly ILogger<DeviceInfoController> _logger;
+    private readonly IDatabaseService _db;
 
-    public DeviceInfoController(ILogger<DeviceInfoController> thelogger)
+    public DeviceInfoController(ILogger<DeviceInfoController> logger, IDatabaseService db)
     {
-        logger = thelogger;
+        _logger = logger;
+        _db     = db;
     }
 
     [HttpPost]
     public async Task<IActionResult> UploadDeviceInfo()
     {
-        ResponseCode response;
-        DeviceInfo? requestData = null;
+        DeviceInfo? requestData;
+        string bodyData;
         try
         {
             using var reader = new StreamReader(Request.Body);
-            var bodyData = await reader.ReadToEndAsync();
-            logger.LogInformation("UploadDeviceInfo: {BodyData}", bodyData);
+            bodyData = await reader.ReadToEndAsync();
+            _logger.LogInformation("UploadDeviceInfo: {BodyData}", bodyData);
 
-            requestData = JsonSerializer.Deserialize<DeviceInfo>(bodyData ?? string.Empty);
-            if (requestData == null)
-            {
-                response = new ResponseCode { ReturnCode = 10002 };
-                return Ok(response);
-            }
+            requestData = JsonSerializer.Deserialize<DeviceInfo>(bodyData);
+            if (requestData == null || string.IsNullOrEmpty(requestData.DeviceId))
+                return Ok(new ResponseCode { ReturnCode = 10002 });
         }
         catch (Exception ex)
         {
-            logger.LogError("Error reading or deserializing request: {Message}", ex.Message);
-            response = new ResponseCode { ReturnCode = 10002 };
-            return Ok(response);
+            _logger.LogError("Error reading or deserializing request: {Message}", ex.Message);
+            return Ok(new ResponseCode { ReturnCode = 10002 });
         }
 
-        response = new ResponseCode { ReturnCode = 0 };
-        return Ok(response);
-    }
+        string recordedAt = System.DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        await _db.InsertDeviceInfo(
+            requestData.DeviceId,
+            recordedAt,
+            requestData.Model,
+            requestData.Version,
+            requestData.WearingStatus,
+            signal: null,
+            bodyData);
 
+        return Ok(new ResponseCode { ReturnCode = 0 });
+    }
 }
+

@@ -31,6 +31,8 @@ public interface IDatabaseService
         double? respAvg, double? respMax, double? respMin, string? sectionsJson,
         int? deepSleep = null, int? lightSleep = null, int? weakSleep = null, int? eyemoveSleep = null);
 
+    Task<SleepCalculation?> GetSleepCalculation(string deviceId, string sleepDate);
+
     Task InsertEcgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson);
     Task InsertPpgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson);
     Task InsertAccWaveform(string deviceId, string recordedAt, int sampleCount, string? accXBase64, string? accYBase64, string? accZBase64);

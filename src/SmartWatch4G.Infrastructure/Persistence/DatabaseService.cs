@@ -402,22 +402,30 @@ CREATE TABLE device_sedentary (
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'sleep_calculations')
 CREATE TABLE sleep_calculations (
-    id           INT IDENTITY(1,1) PRIMARY KEY,
-    device_id    NVARCHAR(50)  NOT NULL,
-    record_date  NVARCHAR(10)  NOT NULL,
-    completed    INT           NOT NULL,
-    start_time   NVARCHAR(30)  NULL,
-    end_time     NVARCHAR(30)  NULL,
-    hr           INT           NULL,
-    turn_times   INT           NULL,
-    resp_avg     FLOAT         NULL,
-    resp_max     FLOAT         NULL,
-    resp_min     FLOAT         NULL,
-    sections     NVARCHAR(MAX) NULL,
-    user_id      INT           NULL,
-    company_id   INT           NULL,
-    created_at   DATETIME2     DEFAULT GETDATE()
+    id            INT IDENTITY(1,1) PRIMARY KEY,
+    device_id     NVARCHAR(50)  NOT NULL,
+    record_date   NVARCHAR(10)  NOT NULL,
+    completed     INT           NOT NULL,
+    start_time    NVARCHAR(30)  NULL,
+    end_time      NVARCHAR(30)  NULL,
+    hr            INT           NULL,
+    turn_times    INT           NULL,
+    resp_avg      FLOAT         NULL,
+    resp_max      FLOAT         NULL,
+    resp_min      FLOAT         NULL,
+    sections      NVARCHAR(MAX) NULL,
+    deep_sleep    INT           NULL,
+    light_sleep   INT           NULL,
+    weak_sleep    INT           NULL,
+    eyemove_sleep INT           NULL,
+    user_id       INT           NULL,
+    company_id    INT           NULL,
+    created_at    DATETIME2     DEFAULT GETDATE()
 );
+IF COL_LENGTH('sleep_calculations','deep_sleep')    IS NULL ALTER TABLE sleep_calculations ADD deep_sleep    INT NULL;
+IF COL_LENGTH('sleep_calculations','light_sleep')   IS NULL ALTER TABLE sleep_calculations ADD light_sleep   INT NULL;
+IF COL_LENGTH('sleep_calculations','weak_sleep')    IS NULL ALTER TABLE sleep_calculations ADD weak_sleep    INT NULL;
+IF COL_LENGTH('sleep_calculations','eyemove_sleep') IS NULL ALTER TABLE sleep_calculations ADD eyemove_sleep INT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ecg_calculations')
 CREATE TABLE ecg_calculations (
@@ -932,6 +940,49 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             await LogAuditAsync(conn, "INSERT", "sleep_calculations", deviceId, recordDate);
         }
         catch (Exception ex) { _logger.LogError(ex, "InsertSleepCalculation failed for {Device}", deviceId); }
+    }
+
+    public async Task<SleepCalculation?> GetSleepCalculation(string deviceId, string sleepDate)
+    {
+        try
+        {
+            await using var conn = await OpenAsync();
+            using var cmd = new SqlCommand(@"
+                SELECT TOP 1
+                    device_id, record_date, completed, start_time, end_time,
+                    hr, turn_times, resp_avg, resp_max, resp_min, sections,
+                    deep_sleep, light_sleep, weak_sleep, eyemove_sleep
+                FROM sleep_calculations
+                WHERE device_id = @dev AND record_date = @rd
+                ORDER BY created_at DESC", conn);
+            cmd.Parameters.AddWithValue("@dev", deviceId);
+            cmd.Parameters.AddWithValue("@rd",  sleepDate);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+            return new SleepCalculation
+            {
+                DeviceId    = reader.GetString(0),
+                RecordDate  = reader.GetString(1),
+                Completed   = reader.GetInt32(2),
+                StartTime   = reader.IsDBNull(3)  ? null : reader.GetString(3),
+                EndTime     = reader.IsDBNull(4)  ? null : reader.GetString(4),
+                Hr          = reader.IsDBNull(5)  ? 0    : reader.GetInt32(5),
+                TurnTimes   = reader.IsDBNull(6)  ? 0    : reader.GetInt32(6),
+                RespAvg     = reader.IsDBNull(7)  ? null : reader.GetDouble(7),
+                RespMax     = reader.IsDBNull(8)  ? null : reader.GetDouble(8),
+                RespMin     = reader.IsDBNull(9)  ? null : reader.GetDouble(9),
+                Sections    = reader.IsDBNull(10) ? null : reader.GetString(10),
+                DeepSleep   = reader.IsDBNull(11) ? null : reader.GetInt32(11),
+                LightSleep  = reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                WeakSleep   = reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                EyemoveSleep = reader.IsDBNull(14) ? null : reader.GetInt32(14),
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetSleepCalculation failed for {Device} {Date}", deviceId, sleepDate);
+            return null;
+        }
     }
 
     public async Task InsertEcgWaveform(string deviceId, string recordedAt, int sampleCount, string rawDataJson)
