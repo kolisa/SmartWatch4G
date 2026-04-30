@@ -50,6 +50,8 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
             string? st, string? et, int hr, int tt,
             double? ra, double? rx, double? rn, string? sec,
             int? deep=null, int? light=null, int? weak=null, int? eye=null) => Task.CompletedTask;
+        public Task<SmartWatch4G.Domain.Entities.SleepCalculation?> GetSleepCalculation(string deviceId, string sleepDate)
+            => Task.FromResult<SmartWatch4G.Domain.Entities.SleepCalculation?>(null);
         public Task InsertEcgWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
         public Task InsertPpgWaveform(string d, string ra, int sc, string json) => Task.CompletedTask;
         public Task InsertAccWaveform(string d, string ra, int sc, string? ax, string? ay, string? az) => Task.CompletedTask;
