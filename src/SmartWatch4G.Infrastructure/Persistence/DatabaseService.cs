@@ -581,6 +581,36 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UQ_sedentary_device_window'
     ALTER TABLE device_sedentary
         ADD CONSTRAINT UQ_sedentary_device_window UNIQUE (device_id, start_hour, end_hour);
 
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_sleep_device_date'
+               AND object_id=OBJECT_ID('sleep_calculations'))
+    CREATE INDEX IX_sleep_device_date
+        ON sleep_calculations (device_id, record_date)
+        INCLUDE (created_at);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_alarms_type_created'
+               AND object_id=OBJECT_ID('alarms'))
+    CREATE INDEX IX_alarms_type_created
+        ON alarms (alarm_type, created_at DESC)
+        INCLUDE (device_id, company_id);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_sos_company_created'
+               AND object_id=OBJECT_ID('sos_events'))
+    CREATE INDEX IX_sos_company_created
+        ON sos_events (company_id, created_at DESC)
+        INCLUDE (device_id);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_gps_company_created'
+               AND object_id=OBJECT_ID('gps_tracks'))
+    CREATE INDEX IX_gps_company_created
+        ON gps_tracks (company_id, created_at DESC)
+        INCLUDE (device_id);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_user_profiles_company_active'
+               AND object_id=OBJECT_ID('user_profiles'))
+    CREATE INDEX IX_user_profiles_company_active
+        ON user_profiles (company_id, is_active)
+        INCLUDE (user_id, name, surname);
+
 -- ── Add user_id / company_id to existing tables (idempotent) ─────────────────
 DECLARE @tables NVARCHAR(MAX) =
     'gps_tracks,health_snapshots,alarms,sos_events,device_info_log,' +
@@ -1936,7 +1966,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
         {
             var dir  = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
 
-            // Latest record per device — no duplicates
+            // Single query: COUNT(*) OVER() on the deduped set replaces the separate COUNT(DISTINCT) round-trip
             var sql = $@"
                 WITH ranked AS (
                     SELECT g.device_id,
@@ -1949,51 +1979,35 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                       AND (@from IS NULL OR g.created_at >= @from)
                       AND (@to   IS NULL OR g.created_at <= @to)
                 )
-                SELECT device_id, user_name, id, gnss_time, longitude, latitude, loc_type, created_at
+                SELECT device_id, user_name, id, gnss_time, longitude, latitude, loc_type, created_at,
+                       COUNT(*) OVER() AS total_count
                 FROM ranked
                 WHERE rn = 1
                 ORDER BY created_at {dir}
                 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY";
 
-            var countSql = @"
-                SELECT COUNT(DISTINCT g.device_id)
-                FROM gps_tracks g
-                INNER JOIN user_profiles u ON u.device_id = g.device_id AND u.is_active = 1
-                WHERE u.company_id = @cid
-                  AND (@from IS NULL OR g.created_at >= @from)
-                  AND (@to   IS NULL OR g.created_at <= @to)";
-
             await using var conn = await OpenAsync();
-            using (var cmd = new SqlCommand(countSql, conn))
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@cid",  companyId);
+            cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+            cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
             {
-                cmd.Parameters.AddWithValue("@cid", companyId);
-                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
-                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                total = (int)(await cmd.ExecuteScalarAsync())!;
-            }
-
-            using (var cmd = new SqlCommand(sql, conn))
-            {
-                cmd.Parameters.AddWithValue("@cid",  companyId);
-                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
-                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                cmd.Parameters.AddWithValue("@skip", skip);
-                cmd.Parameters.AddWithValue("@take", take);
-                await using var r = await cmd.ExecuteReaderAsync();
-                while (await r.ReadAsync())
+                if (total == 0) total = r.GetInt32(8); // total_count: COUNT(*) OVER() as column 8
+                var track = new GnssTrack
                 {
-                    var track = new GnssTrack
-                    {
-                        Id        = r.GetInt32(2),
-                        DeviceId  = r.GetString(0),
-                        GnssTime  = r.GetString(3),
-                        Longitude = r.GetDouble(4),
-                        Latitude  = r.GetDouble(5),
-                        LocType   = r.IsDBNull(6) ? null : r.GetString(6),
-                        CreatedAt = r.GetDateTime(7)
-                    };
-                    list.Add((r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1), track));
-                }
+                    Id        = r.GetInt32(2),
+                    DeviceId  = r.GetString(0),
+                    GnssTime  = r.GetString(3),
+                    Longitude = r.GetDouble(4),
+                    Latitude  = r.GetDouble(5),
+                    LocType   = r.IsDBNull(6) ? null : r.GetString(6),
+                    CreatedAt = r.GetDateTime(7)
+                };
+                list.Add((r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1), track));
             }
         }
         catch (Exception ex) { _logger.LogError(ex, "GetGnssTracksByCompany failed for company {Id}", companyId); }
@@ -2040,39 +2054,30 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             var dir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
             await using var conn = await OpenAsync();
 
-            using (var cmd = new SqlCommand(@"
-                SELECT COUNT(*) FROM health_snapshots
-                WHERE device_id=@dev
-                  AND (@from IS NULL OR created_at >= @from)
-                  AND (@to   IS NULL OR created_at <= @to)", conn))
-            {
-                cmd.Parameters.AddWithValue("@dev", deviceId);
-                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
-                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                total = (int)(await cmd.ExecuteScalarAsync())!;
-            }
-
-            using (var cmd = new SqlCommand($@"
+            // Single query: COUNT(*) OVER() eliminates the separate count round-trip
+            using var cmd = new SqlCommand($@"
                 SELECT id, device_id, record_time, battery, rssi, steps,
                        distance, calorie, avg_hr, max_hr, min_hr,
                        avg_spo2, sbp, dbp, fatigue,
                        body_temp_evi, body_temp_esti, temp_type, bp_bpm, blood_potassium, blood_sugar,
                        bioz_r, bioz_x, bioz_fat, bioz_bmi, bioz_type, breath_rate, mood_level,
-                       created_at
+                       created_at, COUNT(*) OVER() AS total_count
                 FROM health_snapshots
                 WHERE device_id=@dev
                   AND (@from IS NULL OR created_at >= @from)
                   AND (@to   IS NULL OR created_at <= @to)
                 ORDER BY created_at {dir}
-                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn))
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
+            cmd.Parameters.AddWithValue("@dev",  deviceId);
+            cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+            cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
             {
-                cmd.Parameters.AddWithValue("@dev",  deviceId);
-                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
-                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                cmd.Parameters.AddWithValue("@skip", skip);
-                cmd.Parameters.AddWithValue("@take", take);
-                await using var r = await cmd.ExecuteReaderAsync();
-                while (await r.ReadAsync()) list.Add(MapHealthSnapshot(r));
+                if (list.Count == 0) total = r.GetInt32(29); // total_count appended after created_at
+                list.Add(MapHealthSnapshot(r));
             }
         }
         catch (Exception ex) { _logger.LogError(ex, "GetHealthSnapshotsByDevice failed for {Device}", deviceId); }
@@ -2090,23 +2095,8 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             var dir = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
             await using var conn = await OpenAsync();
 
-            // Count distinct devices that have any record in the date window
-            using (var cmd = new SqlCommand(@"
-                SELECT COUNT(DISTINCT h.device_id)
-                FROM health_snapshots h
-                INNER JOIN user_profiles u ON u.device_id=h.device_id AND u.is_active=1
-                WHERE u.company_id=@cid
-                  AND (@from IS NULL OR h.created_at >= @from)
-                  AND (@to   IS NULL OR h.created_at <= @to)", conn))
-            {
-                cmd.Parameters.AddWithValue("@cid", companyId);
-                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
-                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                total = (int)(await cmd.ExecuteScalarAsync())!;
-            }
-
-            // Return only the latest record per device (ROW_NUMBER rn=1) within the date window
-            using (var cmd = new SqlCommand($@"
+            // Single query: COUNT(*) OVER() on the deduped set replaces the separate COUNT(DISTINCT) round-trip
+            using var cmd = new SqlCommand($@"
                 WITH ranked AS (
                     SELECT h.id, h.device_id, h.record_time, h.battery, h.rssi, h.steps,
                            h.distance, h.calorie, h.avg_hr, h.max_hr, h.min_hr,
@@ -2128,58 +2118,58 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
                        avg_spo2, sbp, dbp, fatigue,
                        body_temp_evi, body_temp_esti, temp_type, bp_bpm, blood_potassium, blood_sugar,
                        bioz_r, bioz_x, bioz_fat, bioz_bmi, bioz_type, breath_rate, mood_level,
-                       created_at
+                       created_at, COUNT(*) OVER() AS total_count
                 FROM ranked
                 WHERE rn = 1
                 ORDER BY created_at {dir}
-                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn))
+                OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY", conn);
+            cmd.Parameters.AddWithValue("@cid", companyId);
+            cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
+            cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
+            cmd.Parameters.AddWithValue("@skip", skip);
+            cmd.Parameters.AddWithValue("@take", take);
+            // 0=id,1=device_id,2=user_name,3=record_time,4=battery,5=rssi,6=steps,
+            // 7=distance,8=calorie,9=avg_hr,10=max_hr,11=min_hr,12=avg_spo2,13=sbp,14=dbp,15=fatigue,
+            // 16=body_temp_evi,17=body_temp_esti,18=temp_type,19=bp_bpm,20=blood_potassium,21=blood_sugar,
+            // 22=bioz_r,23=bioz_x,24=bioz_fat,25=bioz_bmi,26=bioz_type,27=breath_rate,28=mood_level,
+            // 29=created_at, 30=total_count
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
             {
-                cmd.Parameters.AddWithValue("@cid", companyId);
-                cmd.Parameters.Add("@from", System.Data.SqlDbType.DateTime2).Value = (object?)from ?? DBNull.Value;
-                cmd.Parameters.Add("@to",   System.Data.SqlDbType.DateTime2).Value = (object?)to   ?? DBNull.Value;
-                cmd.Parameters.AddWithValue("@skip", skip);
-                cmd.Parameters.AddWithValue("@take", take);
-                // 0=id,1=device_id,2=user_name,3=record_time,4=battery,5=rssi,6=steps,
-                // 7=distance,8=calorie,9=avg_hr,10=max_hr,11=min_hr,12=avg_spo2,13=sbp,14=dbp,15=fatigue,
-                // 16=body_temp_evi,17=body_temp_esti,18=temp_type,19=bp_bpm,20=blood_potassium,21=blood_sugar,
-                // 22=bioz_r,23=bioz_x,24=bioz_fat,25=bioz_bmi,26=bioz_type,27=breath_rate,28=mood_level,29=created_at
-                await using var r = await cmd.ExecuteReaderAsync();
-                while (await r.ReadAsync())
+                if (list.Count == 0) total = r.GetInt32(30); // total_count: COUNT(*) OVER() as column 30
+                var snap = new HealthSnapshot
                 {
-                    var snap = new HealthSnapshot
-                    {
-                        Id              = r.GetInt32(0),
-                        DeviceId        = r.GetString(1),
-                        RecordTime      = r.GetString(3),
-                        Battery         = r.IsDBNull(4)  ? null : r.GetInt32(4),
-                        Rssi            = r.IsDBNull(5)  ? null : r.GetInt32(5),
-                        Steps           = r.IsDBNull(6)  ? null : r.GetInt32(6),
-                        Distance        = r.IsDBNull(7)  ? null : r.GetDouble(7),
-                        Calorie         = r.IsDBNull(8)  ? null : r.GetDouble(8),
-                        AvgHr           = r.IsDBNull(9)  ? null : r.GetInt32(9),
-                        MaxHr           = r.IsDBNull(10) ? null : r.GetInt32(10),
-                        MinHr           = r.IsDBNull(11) ? null : r.GetInt32(11),
-                        AvgSpo2         = r.IsDBNull(12) ? null : r.GetInt32(12),
-                        Sbp             = r.IsDBNull(13) ? null : r.GetInt32(13),
-                        Dbp             = r.IsDBNull(14) ? null : r.GetInt32(14),
-                        Fatigue         = r.IsDBNull(15) ? null : r.GetInt32(15),
-                        BodyTempEvi     = r.IsDBNull(16) ? null : r.GetDouble(16),
-                        BodyTempEsti    = r.IsDBNull(17) ? null : r.GetInt32(17),
-                        TempType        = r.IsDBNull(18) ? null : r.GetInt32(18),
-                        BpBpm           = r.IsDBNull(19) ? null : r.GetInt32(19),
-                        BloodPotassium  = r.IsDBNull(20) ? null : r.GetDouble(20),
-                        BloodSugar      = r.IsDBNull(21) ? null : r.GetDouble(21),
-                        BiozR           = r.IsDBNull(22) ? null : r.GetDouble(22),
-                        BiozX           = r.IsDBNull(23) ? null : r.GetDouble(23),
-                        BiozFat         = r.IsDBNull(24) ? null : r.GetDouble(24),
-                        BiozBmi         = r.IsDBNull(25) ? null : r.GetDouble(25),
-                        BiozType        = r.IsDBNull(26) ? null : r.GetInt32(26),
-                        BreathRate      = r.IsDBNull(27) ? null : r.GetDouble(27),
-                        MoodLevel       = r.IsDBNull(28) ? null : r.GetInt32(28),
-                        CreatedAt       = r.GetDateTime(29)
-                    };
-                    list.Add((r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), snap));
-                }
+                    Id              = r.GetInt32(0),
+                    DeviceId        = r.GetString(1),
+                    RecordTime      = r.GetString(3),
+                    Battery         = r.IsDBNull(4)  ? null : r.GetInt32(4),
+                    Rssi            = r.IsDBNull(5)  ? null : r.GetInt32(5),
+                    Steps           = r.IsDBNull(6)  ? null : r.GetInt32(6),
+                    Distance        = r.IsDBNull(7)  ? null : r.GetDouble(7),
+                    Calorie         = r.IsDBNull(8)  ? null : r.GetDouble(8),
+                    AvgHr           = r.IsDBNull(9)  ? null : r.GetInt32(9),
+                    MaxHr           = r.IsDBNull(10) ? null : r.GetInt32(10),
+                    MinHr           = r.IsDBNull(11) ? null : r.GetInt32(11),
+                    AvgSpo2         = r.IsDBNull(12) ? null : r.GetInt32(12),
+                    Sbp             = r.IsDBNull(13) ? null : r.GetInt32(13),
+                    Dbp             = r.IsDBNull(14) ? null : r.GetInt32(14),
+                    Fatigue         = r.IsDBNull(15) ? null : r.GetInt32(15),
+                    BodyTempEvi     = r.IsDBNull(16) ? null : r.GetDouble(16),
+                    BodyTempEsti    = r.IsDBNull(17) ? null : r.GetInt32(17),
+                    TempType        = r.IsDBNull(18) ? null : r.GetInt32(18),
+                    BpBpm           = r.IsDBNull(19) ? null : r.GetInt32(19),
+                    BloodPotassium  = r.IsDBNull(20) ? null : r.GetDouble(20),
+                    BloodSugar      = r.IsDBNull(21) ? null : r.GetDouble(21),
+                    BiozR           = r.IsDBNull(22) ? null : r.GetDouble(22),
+                    BiozX           = r.IsDBNull(23) ? null : r.GetDouble(23),
+                    BiozFat         = r.IsDBNull(24) ? null : r.GetDouble(24),
+                    BiozBmi         = r.IsDBNull(25) ? null : r.GetDouble(25),
+                    BiozType        = r.IsDBNull(26) ? null : r.GetInt32(26),
+                    BreathRate      = r.IsDBNull(27) ? null : r.GetDouble(27),
+                    MoodLevel       = r.IsDBNull(28) ? null : r.GetInt32(28),
+                    CreatedAt       = r.GetDateTime(29)
+                };
+                list.Add((r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), snap));
             }
         }
         catch (Exception ex) { _logger.LogError(ex, "GetHealthSnapshotsByCompany failed for company {Id}", companyId); }

@@ -31,8 +31,15 @@ public sealed class DashboardService : IDashboardService
                 ? allProfiles.Where(p => p.CompanyId == companyId).ToList()
                 : allProfiles;
 
-            var statusTasks = profiles.Select(p => _iwown.GetDeviceStatusAsync(p.DeviceId));
-            var responses   = await Task.WhenAll(statusTasks);
+            // Throttle to 20 concurrent Iwown HTTP calls to avoid exhausting sockets/rate limits
+            var semaphore   = new SemaphoreSlim(20, 20);
+            var statusTasks = profiles.Select(async p =>
+            {
+                await semaphore.WaitAsync();
+                try   { return await _iwown.GetDeviceStatusAsync(p.DeviceId); }
+                finally { semaphore.Release(); }
+            });
+            var responses = await Task.WhenAll(statusTasks);
 
             int onlineCount  = responses.Count(r => DeviceStatusParser.IsOnline(r));
             int offlineCount = profiles.Count - onlineCount;
