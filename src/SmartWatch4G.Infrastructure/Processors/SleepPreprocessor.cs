@@ -22,7 +22,7 @@ public class SleepPreprocessor
         }
         catch (InvalidProtocolBufferException e)
         {
-            _logger.LogError("Parse 80 health history error: {Message}", e.Message);
+            _logger.LogError(e, "Parse 80 health history error: {Message}", e.Message);
             return;
         }
 
@@ -76,6 +76,6 @@ public class SleepPreprocessor
             string sleepStr = System.Text.Json.JsonSerializer.Serialize(sleepDict);
             _logger.LogInformation("{Time} {Seq} {SleepStr}", timeStr, hisData.Seq, sleepStr);
         }
-        catch (Exception ex) { _logger.LogError(ex.Message); }
+        catch (Exception ex) { _logger.LogError(ex, "Serialise sleep data failed"); }
     }
 }

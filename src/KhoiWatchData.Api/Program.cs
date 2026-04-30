@@ -51,10 +51,6 @@ builder.Logging.AddProvider(new MyFileLoggerProvider(
 
 var app = builder.Build();
 
-// Force DatabaseService singleton resolution so InitializeSchema() runs at startup.
-//if (app.Environment.IsEnvironment("Testing"))
-//    app.Services.GetRequiredService<IDatabaseService>();
-
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseSwagger();

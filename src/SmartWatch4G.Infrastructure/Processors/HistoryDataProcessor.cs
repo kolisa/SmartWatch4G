@@ -25,7 +25,7 @@ public class HistoryDataProcessor
         }
         catch (InvalidProtocolBufferException e)
         {
-            _logger.LogError("Parse 80 health history error: {Message}", e.Message);
+            _logger.LogError(e, "Parse 80 health history error: {Message}", e.Message);
             return;
         }
 

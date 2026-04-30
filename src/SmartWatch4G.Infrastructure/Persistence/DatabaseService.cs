@@ -37,28 +37,6 @@ public class DatabaseService : IDatabaseService, IDisposable
         return b.ConnectionString;
     }
 
-    private void EnsureDatabase()
-    {
-        var dbName = new SqlConnectionStringBuilder(_connStr).InitialCatalog;
-        if (string.IsNullOrWhiteSpace(dbName) ||
-            dbName.Equals("master", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        try
-        {
-            using var conn = new SqlConnection(MasterConnStr());
-            conn.Open();
-            using var cmd = new SqlCommand(
-                $"IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'{dbName}') CREATE DATABASE [{dbName}];",
-                conn);
-            cmd.ExecuteNonQuery();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "EnsureDatabase failed for '{Database}'.", dbName);
-        }
-    }
-
     private void InitializeSchema()
     {
         try
@@ -1398,7 +1376,7 @@ WHERE NOT EXISTS (SELECT 1 FROM device_bp_adjust t WHERE t.device_id=d.device_id
             cmd.Parameters.AddWithValue("@addr",  (object?)address            ?? DBNull.Value);
             var newId = (int)(await cmd.ExecuteScalarAsync())!;
             await LogAuditAsync(conn, "INSERT", "companies", null, $"id:{newId},name:{name}");
-            return newId;;
+            return newId;
         }
         catch (Exception ex)
         {
